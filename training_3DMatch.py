@@ -216,7 +216,7 @@ if __name__ == '__main__':
     print('*******************')
 
     # Initiate dataset configuration
-    dataset = ThreeDMatchDataset(config.input_threads)
+    dataset = ThreeDMatchDataset(config.input_threads, voxel_size=config.first_subsampling_dl)
 
     # Create subsampled input clouds
     dl0 = config.first_subsampling_dl

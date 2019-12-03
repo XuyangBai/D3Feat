@@ -59,21 +59,21 @@ class ThreeDMatch(object):
         return pcd
 
     def load_all_ply(self, downsample):
-        pts_filename = join(self.savepath, f'3DMatch_{downsample:.3f}_points.pkl')
+        pts_filename = join(self.savepath, f'3DMatch_{self.split}_{downsample:.3f}_points.pkl')
         if exists(pts_filename):
             with open(pts_filename, 'rb') as file:
                 self.pts = pickle.load(file)
             print(f"Load pts file from {self.savepath}")
             return
-        self.anc_pts = {}
+        self.pts = {}
         for i, anc_id in enumerate(self.ids_list):
             anc_pcd = self.load_ply(self.root, anc_id, downsample=downsample, aligned=True)
             points = np.array(anc_pcd.points)
             print(len(points))
-            self.anc_pts[anc_id] = points
+            self.pts[anc_id] = points
             print('processing ply: {:.1f}%'.format(100 * i / len(self.ids_list)))
         with open(pts_filename, 'wb') as file:
-            pickle.dump(self.anc_pts, file)
+            pickle.dump(self.pts, file)
 
     def get_matching_indices(self, anc_pts, pos_pts, search_voxel_size, K=None):
         match_inds = []
@@ -85,8 +85,8 @@ class ThreeDMatch(object):
         return np.array(match_inds)
 
     def cal_overlap(self, downsample):
-        overlap_filename = join(self.savepath, f'3DMatch_{downsample:.3f}_overlap.pkl')
-        keypts_filename = join(self.savepath, f'3DMatch_{downsample:.3f}_keypts.pkl')
+        overlap_filename = join(self.savepath, f'3DMatch_{self.split}_{downsample:.3f}_overlap.pkl')
+        keypts_filename = join(self.savepath, f'3DMatch_{self.split}_{downsample:.3f}_keypts.pkl')
         if exists(overlap_filename) and exists(keypts_filename):
             with open(overlap_filename, 'rb') as file:
                 self.overlap_ratio = pickle.load(file)
@@ -124,9 +124,6 @@ class ThreeDMatch(object):
                         print(f'\t {anc_id}, {pos_id} overlap ratio: {overlap_ratio}')
                 print('processing {:s} ply: {:.1f}%'.format(scene, 100 * i / len(scene_ids)))
             print('Finish {:s}, Done in {:.1f}s'.format(scene, time.time() - t0))
-            scene_savepath = join(self.savepath, scene + '.pkl')
-            with open(scene_savepath, 'wb') as file:
-                pickle.dump(scene_overlap, file)
 
         with open(overlap_filename, 'wb') as file:
             pickle.dump(self.overlap_ratio, file)

@@ -128,7 +128,7 @@ class ThreeDMatchDataset(Dataset):
     # Initiation methods
     # ------------------------------------------------------------------------------------------------------------------
 
-    def __init__(self, input_threads=8, load_test=False):
+    def __init__(self, input_threads=8, voxel_size=0.03, load_test=False):
         Dataset.__init__(self, 'ThreeDMatch')
 
         ####################
@@ -144,24 +144,19 @@ class ThreeDMatchDataset(Dataset):
         # Load test set or train set?
         self.load_test = load_test
 
+        # voxel size
+        self.downsample = voxel_size
+
         ##########################
         # Parameters for the files
         ##########################
 
         # Path of the folder containing ply files
-        self.rgbdpath = '../Point_Cloud_Descriptor/data/3DMatch/rgbd_fragments'
-        # self.rgbdpath = '../s102/data/3DMatch/rgbd_fragments'
-        self.writepath = 'data/3DMatch/'
-        # self.num_train = 6579
-        # self.num_test = 1000
+        self.root = 'data/3DMatch/'
         
         # Initiate containers
-        self.anc_points = {'train': [], 'val': [], 'test': []}
-        self.pos_points = {'train': [], 'val': [], 'test': []}
-        # actually this keypoints file is not used in training process
-        self.anc_keypts = {'train': [], 'val': [], 'test': []}
-        self.pos_keypts = {'train': [], 'val': [], 'test': []}
-        self.idpair_list = {'train': [], 'val': [], 'test': []}
+        self.anc_points = {'train':[], 'val':[], 'test':[]}
+        self.keypts = {'train': [], 'val': [], 'test': []}
         self.anc_to_pos = {'train': {}, 'val': {}, 'test': {}}
         self.ids_list = {'train': [], 'val': [], 'test': []}
 
@@ -174,68 +169,39 @@ class ThreeDMatchDataset(Dataset):
     def prepare_3dmatch_ply(self, split='train'):
 
         print('\nPreparing ply files')
-        t0 = time.time()
+        pts_filename = join(self.root, f'3DMatch_{split}_{self.downsample:.3f}_points.pkl')
+        keypts_filename = join(self.root, f'3DMatch_{split}_{self.downsample:.3f}_keypts.pkl')
+    
+        if exists(pts_filename) and exists(keypts_filename):
+            with open(pts_filename, 'rb') as file:
+                data = pickle.load(file)
+                self.anc_points[split] = [*data.values()]
+                self.ids_list[split] = [*data.keys()]
+            with open(keypts_filename, 'rb') as file:
+                self.keypts[split] = pickle.load(file)
+        else:
+            print("PKL file not found.")
+            return 
 
-        if split == 'val':
-            split = 'test'
-        with open(os.path.join(self.rgbdpath, 'scene_list_{0}.txt'.format(split))) as f:
-            scene_list = f.readlines()
 
-        for scene in scene_list:
-            scene = scene.replace("\n", "")
-            for seq in sorted(os.listdir(os.path.join(self.rgbdpath, scene))):
-                if not seq.startswith('seq'):
-                    continue
-                scene_path = os.path.join(self.rgbdpath, scene + '/{}'.format(seq))
-                ids = [scene + "/{}/".format(seq) + str(filename.split(".")[0]) for filename in os.listdir(scene_path) if filename.endswith('ply')]
-                ids = sorted(ids, key=lambda x: int(x.split("_")[-1]))
-                if split == 'test':
-                    self.ids_list['val'] += ids 
-                else:
-                    self.ids_list[split] += ids
-                print("Scene {0}, seq {1}: num ply: {2}".format(scene, seq, len(ids)))
 
-        # ply_path = join(self.plypath, '{:s}_ply'.format(split))
-        # if not exists(ply_path):
-        #     makedirs(ply_path)
-        pklpath = join(self.rgbdpath, 'backup_pkl_5000_fast')
-        anc_points_filename = join(self.rgbdpath, '{}_{:.3f}_points.pkl'.format(split, 0.03)) # aligned point cloud 
-        anc_keypts_filename = join(pklpath, '{}_{:.3f}_anc_keypts.pkl'.format(split, 0.03))   # keypoint indices for each point cloud
-        ids_pair_filename = join(pklpath, '{}_{:.3f}_anc_ids.pkl'.format(split, 0.03))        # ids_pair : {id1}_{id2}
-
-        if split == 'test':
-            split = 'val'
-
-        # pos_keypts_filename = join(pklpath, '{}_{:.3f}_pos_keypts.pkl'.format(split, 0.03))
-        # pos_points_filename = join(self.writepath, '{}_{:.3f}_pos_points.pkl'.format(split, self.downsample))
-        
-        if exists(anc_points_filename) and exists(ids_pair_filename) and exists(anc_keypts_filename):
-            with open(anc_points_filename, 'rb') as file:
-                self.anc_points[split] = pickle.load(file)
-                # self.pos_points[split] = pickle.load(file)
-            with open(anc_keypts_filename, 'rb') as file:
-                self.anc_keypts[split] = pickle.load(file)
-            # with open(pos_keypts_filename, 'rb') as file:
-            #     self.pos_keypts[split] = pickle.load(file)
-            with open(ids_pair_filename, 'rb') as file:
-                self.idpair_list[split] = pickle.load(file)
-            for idpair in self.idpair_list[split]:
-                anc = idpair.split(",")[0]
-                pos = idpair.split(",")[1]
-                # add (key -> value)  anc -> pos 
-                if anc not in self.anc_to_pos[split].keys():
-                    self.anc_to_pos[split][anc] = [pos]
-                else:
-                    self.anc_to_pos[split][anc] += [pos]
-            if split == 'train':
-                self.num_train = len(list(self.anc_to_pos[split].keys()))
-                print("Num_train", self.num_train)
+        for idpair in self.keypts[split].keys():
+            anc = idpair.split("@")[0]
+            pos = idpair.split("@")[1]
+            # add (key -> value)  anc -> pos 
+            if anc not in self.anc_to_pos[split].keys():
+                self.anc_to_pos[split][anc] = [pos]
             else:
-                self.num_val = len(list(self.anc_to_pos[split].keys()))
-                print("Num_test", self.num_val)
-            assert len(self.ids_list[split]) == len(self.anc_points[split])
-            # keys = list(self.anc_to_pos[split].keys())
-            return
+                self.anc_to_pos[split][anc] += [pos]
+        if split == 'train':
+            self.num_train = len(list(self.anc_to_pos[split].keys()))
+            print("Num_train", self.num_train)
+        else:
+            self.num_val = len(list(self.anc_to_pos[split].keys()))
+            print("Num_val", self.num_val)
+        import pdb
+        pdb.set_trace()
+        return
 
     def get_batch_gen(self, split, config):
         """
@@ -311,59 +277,65 @@ class ThreeDMatchDataset(Dataset):
                 n = anc_points.shape[0] + pos_points.shape[0]
                     
                 if split == 'test': # for test, use all 5000 the anc_keypts 
-                    anc_keypts = self.anc_keypts[split][anc_ind].astype(np.int32)
-                    pos_keypts = self.pos_keypts[split][pos_ind].astype(np.int32)
-                    assert (np.array_equal(anc_keypts, pos_keypts))
-                    anc_keypts = anc_keypts
-                    pos_keypts = anc_keypts + len(anc_points)
+                    anc_keypts = np.array([])
+                    pos_keypts = np.array([])
+                    # anc_keypts = self.anc_keypts[split][anc_ind].astype(np.int32)
+                    # pos_keypts = self.pos_keypts[split][pos_ind].astype(np.int32)
+                    # assert (np.array_equal(anc_keypts, pos_keypts))
+                    # anc_keypts = anc_keypts
+                    # pos_keypts = anc_keypts + len(anc_points)
                     # pos_keypts = self.pos_keypts[split][ind].astype(np.int32) + len(anc_points)
-                    assert(np.array_equal(anc_points, pos_points))
-                    assert(np.array_equal(anc_keypts, pos_keypts - len(anc_points)))
+                    # assert(np.array_equal(anc_points, pos_points))
+                    # assert(np.array_equal(anc_keypts, pos_keypts - len(anc_points)))
                     # add rotation to test on Rotated3DMatch
                     # anc_points = rotate(anc_points, num_axis=3)
                     # pos_points = rotate(pos_points, num_axis=3)
                 else:
-                    # here the anc_keypts and pos_keypts is useless
-                    # anc_keypts = np.random.choice(len(anc_points), 10)
-                    # pos_keypts = np.random.choice(len(pos_points), 10)
-                    if anc_points.shape[0] > 60000 or pos_points.shape[0] > 60000:
+                    if anc_points.shape[0] > 80000 or pos_points.shape[0] > 80000:
                         continue
                     if anc_points.shape[0] < 2000 or pos_points.shape[0] < 2000:
                         continue
-
-                    if split == 'fake train':
-                        # training does not need this keypts 
-                        anc_keypts = np.random.choice(len(anc_points), 200)
-                        pos_keypts = np.random.choice(len(anc_points), 200)
+                    anc_keypts = self.keypts[split][f'{anc_id}@{pos_id}'][:, 0]
+                    pos_keypts = self.keypts[split][f'{anc_id}@{pos_id}'][:, 1]
+                    if split == 'train':
+                        selected_ind = np.random.choice(min(len(anc_keypts), len(pos_keypts)), config.keypts_num, replace=False)
                     else:
-                        anc_keypts = np.random.choice(len(anc_points), 400)
-                        pos_pcd = open3d.PointCloud()
-                        pos_pcd.points = open3d.utility.Vector3dVector(pos_points)
-                        kdtree = open3d.geometry.KDTreeFlann(pos_pcd)
-                        pos_ind = []
-                        anc_ind = []
-                        for pts, i in zip(anc_points[anc_keypts], anc_keypts):
-                            _, ind, dis = kdtree.search_knn_vector_3d(pts, 1)
-                            if dis[0] < 0.001 and ind[0] not in pos_ind and i not in anc_ind:
-                                pos_ind.append(ind[0])
-                                anc_ind.append(i)
-                                if len(anc_ind) >= config.keypts_num:
-                                    break
+                        selected_ind = np.random.choice(min(len(anc_keypts), len(pos_keypts)), 64, replace=False)
+                    anc_keypts = anc_keypts[selected_ind]
+                    pos_keypts = pos_keypts[selected_ind] + len(anc_points)
+                    # if split == 'fake train':
+                    #     # training does not need this keypts 
+                    #     anc_keypts = np.random.choice(len(anc_points), 200)
+                    #     pos_keypts = np.random.choice(len(anc_points), 200)
+                    # else:
+                    #     anc_keypts = np.random.choice(len(anc_points), 400)
+                    #     pos_pcd = open3d.PointCloud()
+                    #     pos_pcd.points = open3d.utility.Vector3dVector(pos_points)
+                    #     kdtree = open3d.geometry.KDTreeFlann(pos_pcd)
+                    #     pos_ind = []
+                    #     anc_ind = []
+                    #     for pts, i in zip(anc_points[anc_keypts], anc_keypts):
+                    #         _, ind, dis = kdtree.search_knn_vector_3d(pts, 1)
+                    #         if dis[0] < 0.001 and ind[0] not in pos_ind and i not in anc_ind:
+                    #             pos_ind.append(ind[0])
+                    #             anc_ind.append(i)
+                    #             if len(anc_ind) >= config.keypts_num:
+                    #                 break
 
-                        anc_keypts = np.array(anc_ind)
-                        pos_keypts = np.array(pos_ind)
-                        pos_keypts = pos_keypts + len(anc_points)
+                    #     anc_keypts = np.array(anc_ind)
+                    #     pos_keypts = np.array(pos_ind)
+                    #     pos_keypts = pos_keypts + len(anc_points)
                     
-                    # No matter how many num_keypts are used for training, test only use 64 pair.
-                    if len(anc_keypts) >= config.keypts_num:
-                        if split == 'train':
-                            selected_ind = np.random.choice(range(len(anc_keypts)), config.keypts_num, replace=False)
-                        else:
-                            selected_ind = np.random.choice(range(len(anc_keypts)), 64, replace=False)
-                        anc_keypts = anc_keypts[selected_ind]
-                        pos_keypts = pos_keypts[selected_ind]
-                    else: # if can not build enough correspondence, then skip this fragments pair.
-                        continue
+                    # # No matter how many num_keypts are used for training, test only use 64 pair.
+                    # if len(anc_keypts) >= config.keypts_num:
+                    #     if split == 'train':
+                    #         selected_ind = np.random.choice(range(len(anc_keypts)), config.keypts_num, replace=False)
+                    #     else:
+                    #         selected_ind = np.random.choice(range(len(anc_keypts)), 64, replace=False)
+                    #     anc_keypts = anc_keypts[selected_ind]
+                    #     pos_keypts = pos_keypts[selected_ind]
+                    # else: # if can not build enough correspondence, then skip this fragments pair.
+                    #     continue
                     
 
                     # data augmentations: noise
@@ -500,11 +472,11 @@ class ThreeDMatchDataset(Dataset):
                 keypts_id = np.array(keypts_id)
 
                 self.anc_points['test'] += [points]
-                self.pos_points['test'] += [points]
-                self.anc_keypts['test'] += [keypts_id]
-                self.pos_keypts['test'] += [keypts_id]
-                self.idpair_list['test'] += "{0},{1}".format(scene + '/' + ind, scene + '/' + ind)
-                self.anc_to_pos['test'][ind] = [ind]
+                # self.pos_points['test'] += [points]
+                # self.anc_keypts['test'] += [keypts_id]
+                # self.pos_keypts['test'] += [keypts_id]
+                # self.idpair_list['test'] += "{0},{1}".format(scene + '/' + ind, scene + '/' + ind)
+                # self.anc_to_pos['test'][ind] = [ind]
                 self.ids_list['test'] += [scene + '/' + ind]
         return
 
