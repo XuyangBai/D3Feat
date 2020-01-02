@@ -1,4 +1,5 @@
 */__pycache__/*
+.idea/
 data/
 results/
 snapshot/
@@ -12,7 +13,6 @@ kernels/dispositions
 geometric_registration_kitti/*
 geometric_registration/3DSmoothNet/
 geometric_registration/pred_result/*
-geometric_registration/gt_result/*
 geometric_registration/kpconv_*
 geometric_registration_eth/pred_result/*
 geometric_registration_eth/kpconv_*
