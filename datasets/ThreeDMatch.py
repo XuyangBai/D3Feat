@@ -1,26 +1,3 @@
-#
-#
-#      0=========================0
-#      |    Kernel Point CNN     |
-#      0=========================0
-#
-#
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#      Handle ThreeDMatch dataset in a class
-#
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#      Hugues THOMAS - 11/06/2018
-#
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#           Imports and global variables
-#       \**********************************/
-#
-
 # Basic libs
 import os
 import tensorflow as tf
@@ -167,6 +144,10 @@ class ThreeDMatchDataset(Dataset):
             self.prepare_3dmatch_ply(split='val')
 
     def prepare_3dmatch_ply(self, split='train'):
+        """
+        Load pre-generated point cloud, keypoint correspondence(the indices) to save time. 
+        Construct the self.anc_to_pos dictionary.
+        """
 
         print('\nPreparing ply files')
         pts_filename = join(self.root, f'3DMatch_{split}_{self.downsample:.3f}_points.pkl')
@@ -183,8 +164,6 @@ class ThreeDMatchDataset(Dataset):
             print("PKL file not found.")
             return 
 
-
-
         for idpair in self.keypts[split].keys():
             anc = idpair.split("@")[0]
             pos = idpair.split("@")[1]
@@ -199,8 +178,6 @@ class ThreeDMatchDataset(Dataset):
         else:
             self.num_val = len(list(self.anc_to_pos[split].keys()))
             print("Num_val", self.num_val)
-        import pdb
-        pdb.set_trace()
         return
 
     def get_batch_gen(self, split, config):
@@ -279,14 +256,6 @@ class ThreeDMatchDataset(Dataset):
                 if split == 'test': # for test, use all 5000 the anc_keypts 
                     anc_keypts = np.array([])
                     pos_keypts = np.array([])
-                    # anc_keypts = self.anc_keypts[split][anc_ind].astype(np.int32)
-                    # pos_keypts = self.pos_keypts[split][pos_ind].astype(np.int32)
-                    # assert (np.array_equal(anc_keypts, pos_keypts))
-                    # anc_keypts = anc_keypts
-                    # pos_keypts = anc_keypts + len(anc_points)
-                    # pos_keypts = self.pos_keypts[split][ind].astype(np.int32) + len(anc_points)
-                    # assert(np.array_equal(anc_points, pos_points))
-                    # assert(np.array_equal(anc_keypts, pos_keypts - len(anc_points)))
                     # add rotation to test on Rotated3DMatch
                     # anc_points = rotate(anc_points, num_axis=3)
                     # pos_points = rotate(pos_points, num_axis=3)
@@ -303,11 +272,13 @@ class ThreeDMatchDataset(Dataset):
                         selected_ind = np.random.choice(min(len(anc_keypts), len(pos_keypts)), 64, replace=False)
                     anc_keypts = anc_keypts[selected_ind]
                     pos_keypts = pos_keypts[selected_ind] + len(anc_points)
-                    # if split == 'fake train':
+
+                    # if split == 'train':
                     #     # training does not need this keypts 
                     #     anc_keypts = np.random.choice(len(anc_points), 200)
                     #     pos_keypts = np.random.choice(len(anc_points), 200)
                     # else:
+                    #     # find the correspondence by nearest neighbors sourch.
                     #     anc_keypts = np.random.choice(len(anc_points), 400)
                     #     pos_pcd = open3d.PointCloud()
                     #     pos_pcd.points = open3d.utility.Vector3dVector(pos_points)
@@ -337,7 +308,6 @@ class ThreeDMatchDataset(Dataset):
                     # else: # if can not build enough correspondence, then skip this fragments pair.
                     #     continue
                     
-
                     # data augmentations: noise
                     anc_noise = np.random.rand(anc_points.shape[0], 3) * config.augment_noise
                     pos_noise = np.random.rand(pos_points.shape[0], 3) * config.augment_noise
@@ -357,38 +327,6 @@ class ThreeDMatchDataset(Dataset):
                 ti_list += [p_i]
                 ti_list_pos += [p_i]
 
-                # In case batch is full, yield it and reset it
-                # if batch_n + n > self.batch_limit and batch_n > 0:
-                # if batch_n > 0 and n > 0:
-                #     yield (np.concatenate(anc_points_list + pos_points_list, axis=0), # anc_points
-                #            np.concatenate(anc_keypts_list, axis=0),     # anc_keypts
-                #            np.concatenate(pos_keypts_list, axis=0),
-                #            np.array(ti_list + ti_list_pos, dtype=np.int32),       # anc_obj_index
-                #            np.array([tp.shape[0] for tp in anc_points_list] + [tp.shape[0] for tp in pos_points_list]), # anc_stack_length 
-                #     )
-                #     print("\t", anc_id, pos_id)
-                #     anc_points_list = []
-                #     pos_points_list = []
-                #     anc_keypts_list = []
-                #     pos_keypts_list = []
-                #     ti_list = []
-                #     ti_list_pos = []
-                #     batch_n = 0
-
-
-                # Update batch size
-                # batch_n += n
-
-                # yield (np.concatenate(anc_points_list, axis=0), # anc_points
-                #         np.concatenate(anc_keypts_list, axis=0),     # anc_keypts
-                #         np.array(ti_list, dtype=np.int32),       # anc_obj_index
-                #         np.array([tp.shape[0] for tp in anc_points_list]), # anc_stack_length 
-                        
-                #         np.concatenate(pos_points_list, axis=0), # pos_points
-                #         np.concatenate(pos_keypts_list, axis=0), # pos_keypts 
-                #         np.array(ti_list_pos, dtype=np.int32),   # pos_obj_index 
-                #         np.array([tp.shape[0] for tp in pos_points_list]), # anc_stack_length 
-                #         )
                 yield (np.concatenate(anc_points_list + pos_points_list, axis=0), # anc_points
                         np.concatenate(anc_keypts_list, axis=0),     # anc_keypts
                         np.concatenate(pos_keypts_list, axis=0),    
@@ -397,7 +335,6 @@ class ThreeDMatchDataset(Dataset):
                         np.array([anc_id, pos_id]),
                         np.concatenate(backup_anc_points_list + backup_pos_points_list, axis=0)
                 )
-                # print("\t Yield ", anc_id, pos_id)
                 anc_points_list = []
                 pos_points_list = []
                 anc_keypts_list = []
@@ -406,16 +343,12 @@ class ThreeDMatchDataset(Dataset):
                 backup_pos_points_list = []
                 ti_list = []
                 ti_list_pos = []
-                import time
-                # time.sleep(0.4)
 
         ##################
         # Return generator
         ##################
 
         # Generator types and shapes
-        # gen_types = (tf.float32, tf.int32, tf.int32, tf.int32,  tf.float32, tf.int32, tf.int32, tf.int32)
-        # gen_shapes = ([None, 3], [None], [None], [None], [None, 3], [None], [None], [None])
         gen_types = (tf.float32, tf.int32, tf.int32,  tf.int32, tf.int32, tf.string, tf.float32)
         gen_shapes = ([None, 3], [None], [None], [None], [None], [None], [None, 3])
 
@@ -436,6 +369,9 @@ class ThreeDMatchDataset(Dataset):
         return tf_map
 
     def prepare_geometry_registration(self):
+        """
+        Prepare the point cloud and keypoints indices (if use predefined keypoints) for testing (geometric registration)
+        """
         scene_list = [
             '7-scenes-redkitchen',
             'sun3d-home_at-home_at_scan1_2013_jan_1',
@@ -472,11 +408,6 @@ class ThreeDMatchDataset(Dataset):
                 keypts_id = np.array(keypts_id)
 
                 self.anc_points['test'] += [points]
-                # self.pos_points['test'] += [points]
-                # self.anc_keypts['test'] += [keypts_id]
-                # self.pos_keypts['test'] += [keypts_id]
-                # self.idpair_list['test'] += "{0},{1}".format(scene + '/' + ind, scene + '/' + ind)
-                # self.anc_to_pos['test'][ind] = [ind]
                 self.ids_list['test'] += [scene + '/' + ind]
         return
 
