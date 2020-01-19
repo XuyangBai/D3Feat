@@ -1,27 +1,3 @@
-#
-#
-#      0=================================0
-#      |    Kernel Point Convolutions    |
-#      0=================================0
-#
-#
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#      Callable script to start a training on ThreeDMatch dataset
-#
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#      Hugues THOMAS - 11/06/2018
-#
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#           Imports and global variables
-#       \**********************************/
-#
-
-
 # Common libs
 import time
 import os
@@ -53,15 +29,7 @@ class KITTIConfig(Config):
     ####################
     is_test = False
     gpu_id = 0
-    # Dataset name in the format 'ShapeNetPart_Object' to segment an object class independently or 'ShapeNetPart_multi'
-    # to segment all objects with a single model.
     dataset = 'KITTI'
-
-    # Number of classes in the dataset (This value is overwritten by dataset class when initiating input pipeline).
-    num_classes = None
-
-    # Type of task performed on this dataset (also overwritten)
-    network_model = None
 
     # Number of CPU threads for the input pipeline
     input_threads = 8
@@ -75,11 +43,11 @@ class KITTIConfig(Config):
                     'resnetb_strided',
                     'resnetb',
                     'resnetb_strided',
-                    'resnetb', # 'resnetb_deformable', 
-                    'resnetb_strided', # 'resnetb_deformable_strided',
-                    'resnetb', # 'resnetb_deformable',
-                    'resnetb_strided', # 'resnetb_deformable_strided',
-                    'resnetb', # 'resnetb_deformable',
+                    'resnetb', 
+                    'resnetb_strided', 
+                    'resnetb', 
+                    'resnetb_strided', 
+                    'resnetb',
                     'nearest_upsample',
                     'unary',
                     'nearest_upsample',
@@ -89,7 +57,7 @@ class KITTIConfig(Config):
                     'nearest_upsample',
                     'unary',
                     'last_unary']
-                    # 'unary']
+                    ]
 
     # KPConv specific parameters
     num_kernel_points = 15

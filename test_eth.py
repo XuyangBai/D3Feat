@@ -1,26 +1,3 @@
-#
-#
-#      0=================================0
-#      |    Kernel Point Convolutions    |
-#      0=================================0
-#
-#
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#      Callable script to test any model on any dataset
-#
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#      Hugues THOMAS - 11/06/2018
-#
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-#
-#           Imports and global variables
-#       \**********************************/
-#
-
 # Common libs
 import time
 import os
@@ -54,11 +31,12 @@ def test_caller(path, step_ind, on_val):
     # Load model parameters
     config = Config()
     config.load(path)
+    # Should change the parameter of 3DMatch model to adopt to ETH 
     import pdb
     pdb.set_trace()
-    # config.first_subsampling_dl = 0.05
-    # config.dataset = 'ETH'
-    # config.KP_extent = 2
+    config.first_subsampling_dl = 0.05
+    config.dataset = 'ETH'
+    config.KP_extent = 2
 
     ##################################
     # Change model parameters for test
@@ -102,8 +80,6 @@ def test_caller(path, step_ind, on_val):
 
     # Find which snapshot to restore
     chosen_step = np.sort(snap_steps)[step_ind]
-    import pdb 
-    pdb.set_trace()
     chosen_snap = os.path.join(path, 'snapshots', 'snap-{:d}'.format(chosen_step))
 
     # Create a tester class
@@ -127,6 +103,7 @@ def test_caller(path, step_ind, on_val):
 
 if __name__ == '__main__':
 
+    # Default is last log and last snapshot
     chosen_log = 'last_KITTI'
     chosen_snapshot = -1
     on_val = True
@@ -141,15 +118,14 @@ if __name__ == '__main__':
 
     # List all training logs
     logs = np.sort([os.path.join('results', f) for f in os.listdir('results') if f.startswith('Log')])
-    # Find the last log of asked dataset
+    # Find the last log of asked dataset or manually specify the log path
     for log in logs[::-1]:
         log_config = Config()
         log_config.load(log)
         if log_config.dataset.startswith(test_dataset):
             chosen_log = log
             break
-    import pdb
-    pdb.set_trace()
+    # chosen_log = `results/Log_`
 
     # Check if log exists
     if not os.path.exists(chosen_log):
