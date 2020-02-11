@@ -57,7 +57,6 @@ class ThreeDMatchConfig(Config):
                     'nearest_upsample',
                     'unary',
                     'last_unary']
-                    ]
 
     # KPConv specific parameters
     num_kernel_points = 15

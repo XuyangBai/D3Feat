@@ -33,9 +33,8 @@ import shutil
 import os
 
 # Convolution functions
-# from models.network_blocks import assemble_FCNN_blocks
 from models.D2Net import assemble_FCNN_blocks
-from loss import cdist, LOSS_CHOICES
+from utils.loss import cdist, LOSS_CHOICES
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -132,15 +131,6 @@ class KernelPointFCNN:
         # Create layers
         # with tf.device('/gpu:%d' % config.gpu_id):
         with tf.variable_scope('KernelPointNetwork', reuse=False) as scope:
-            # self.out_features, self.out_scores, self.anc_key, self.pos_key, self.keypts_distance = assemble_FCNN_blocks(self.anchor_inputs, self.config, self.dropout_prob)
-            # condition = self.dropout_prob < 0.99
-            # def true_fn(): # for training
-            #     return tf.cast(self.anc_key, tf.int32), tf.cast(self.pos_key, tf.int32), self.keypts_distance
-            # def false_fn(): # for evalidation 
-            #     anc_keypts = tf.gather(self.anchor_inputs['backup_points'], self.anchor_keypts_inds)
-            #     keypts_distance = cdist(anc_keypts, anc_keypts, metric='euclidean')
-            #     return self.anchor_keypts_inds, self.positive_keypts_inds, keypts_distance
-            # self.anchor_keypts_inds, self.positive_keypts_inds, self.keypts_distance = tf.cond(condition, true_fn, false_fn)
             self.out_features, self.out_scores  = assemble_FCNN_blocks(self.anchor_inputs, self.config, self.dropout_prob)
             anc_keypts = tf.gather(self.anchor_inputs['backup_points'], self.anchor_keypts_inds)
             self.keypts_distance = cdist(anc_keypts, anc_keypts, metric='euclidean')
@@ -155,32 +145,21 @@ class KernelPointFCNN:
         ########
 
         with tf.variable_scope('loss'):
-            # anchor_list = tf.split(self.output_features_anchor, num_or_size_splits=1, axis=0)
-            # positive_list = tf.split(self.output_features_positive, num_or_size_splits=1, axis=0)
-            # loss_list = []
-            # acc_list = []
-            # for i in range(1):
-            #     positiveIDS = tf.range(tf.shape(anchor_list[i])[0])
-            #     positiveIDS = tf.reshape(positiveIDS, [tf.shape(anchor_list[i])[0]])
-            #     dists = cdist(anchor_list[i], positive_list[i], metric='euclidean')
-            #     batchhard_loss, accuracy = LOSS_CHOICES['batch_hard'](dists, positiveIDS, margin=1)
-            #     loss_list.append(batchhard_loss)
-            #     acc_list.append(accuracy)
-            # self.batchhard_loss = tf.reduce_mean(tf.stack(loss_list))
-            # self.accuracy = tf.reduce_mean(tf.stack(acc_list))
+            # calculate the distance between anchor and positive in feature space.
             positiveIDS = tf.range(tf.size(self.anchor_keypts_inds))
             positiveIDS = tf.reshape(positiveIDS, [tf.size(self.anchor_keypts_inds)])
             self.anchor_keypoints_feat = tf.gather(self.out_features, self.anchor_keypts_inds)
             self.positive_keypoints_feat = tf.gather(self.out_features, self.positive_keypts_inds)
             dists = cdist(self.anchor_keypoints_feat, self.positive_keypoints_feat, metric='euclidean')
             self.dists = dists
-            # to avoid false negative. safe radius is important.
+            # add 10 to the false negative pairs. 
             same_identity_mask = tf.equal(tf.expand_dims(positiveIDS, axis=1), tf.expand_dims(positiveIDS, axis=0))
             false_negative_mask = tf.less(self.keypts_distance, config.safe_radius)
             mask = tf.logical_and(false_negative_mask, tf.logical_not(same_identity_mask))
             self.dists += tf.scalar_mul(10, tf.cast(mask, tf.float32))
-            # dists = cdist(self.output_features_anchor[self.keypts_inds], self.output_features_positive[self.keypts_inds], metric='euclidean')
-            self.batchhard_loss, self.accuracy, self.average_dist = LOSS_CHOICES['batch_hard'](self.dists, positiveIDS, margin=1)
+            # calculate the contrastive loss using the dist
+            self.batchhard_loss, self.accuracy, self.average_dist = LOSS_CHOICES['batch_hard'](self.dists, positiveIDS)
+            # calculate the score loss.
             if config.repeat_loss_weight != 0:
                 self.anchor_scores = tf.gather(self.out_scores, self.anchor_keypts_inds)
                 self.positve_scores = tf.gather(self.out_scores, self.positive_keypts_inds)
@@ -197,9 +176,6 @@ class KernelPointFCNN:
             def false_fn(): 
                 return tf.constant(0, dtype=self.batchhard_loss.dtype), tf.constant(0, dtype=self.repeat_loss.dtype), tf.constant(-1, dtype=self.accuracy.dtype), tf.constant(0, dtype=self.average_dist.dtype)
             self.batchhard_loss, self.repeat_loss, self.accuracy, self.average_dist = tf.cond(condition, true_fn, false_fn)
-            # self.l2_loss = tf.math.scalar_mul(0.0, tf.reduce_mean(tf.norm(self.output_features_anchor - self.output_features_positive, ord='euclidean')))
-            # Add regularization
-            # self.loss = self.regularization_losses() + self.batchhard_loss + self.l2_loss
             # Get L2 norm of all weights
             regularization_losses = [tf.nn.l2_loss(v) for v in tf.global_variables() if 'weights' in v.name]
             self.regularization_loss = self.config.weights_decay * tf.add_n(regularization_losses)

@@ -11,6 +11,7 @@ repeatability/*.log
 repeatability/*/
 kernels/dispositions
 geometric_registration_kitti/*
+geometric_registration/oldlog/*
 geometric_registration/3DSmoothNet/
 geometric_registration/pred_result/*
 geometric_registration/kpconv_*

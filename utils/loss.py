@@ -80,16 +80,14 @@ def get_at_indices(tensor, indices):
     return tf.gather_nd(tensor, tf.stack((counter, indices), -1))
 
 
-def batch_hard(dists, pids, margin, batch_precision_at_k=None):
-    """Computes the batch-hard loss from arxiv.org/abs/1703.07737.
+def batch_hard(dists, pids, pos_margin=0,1, neg_margin=1.4, batch_precision_at_k=None):
+    """Computes the contrastive loss.
 
     Args:
         dists (2D tensor): A square all-to-all distance matrix as given by cdist.
         pids (1D tensor): The identities of the entries in `batch`, shape (B,).
             This can be of any type that can be compared, thus also a string.
-        margin: The value of the margin if a number, alternatively the string
-            'soft' for using the soft-margin formulation, or `None` for not
-            using a margin at all.
+        pos_margin, neg_margin.
 
     Returns:
         A 1D tensor of shape (B,) containing the loss value for each sample.
@@ -118,7 +116,7 @@ def batch_hard(dists, pids, margin, batch_precision_at_k=None):
         accuracy = tf.reduce_sum(tf.cast(tf.greater_equal(0., diff), tf.float32)) / tf.cast(tf.shape(diff)[0], tf.float32)
         if isinstance(margin, numbers.Real):
             # diff = tf.maximum(diff + margin, 0.0)
-            diff = tf.maximum(furthest_positive - 0.1, 0.0) + tf.maximum(1.4 - closest_negative, 0.0)
+            diff = tf.maximum(furthest_positive - pos_margin, 0.0) + tf.maximum(neg_margin - closest_negative, 0.0)
         elif margin == 'soft':
             diff = tf.nn.softplus(diff)
         elif margin.lower() == 'none':

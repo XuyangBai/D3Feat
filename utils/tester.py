@@ -181,15 +181,6 @@ class ModelTester:
 
     # Test main methods
     # ------------------------------------------------------------------------------------------------------------------
-    def find_ind_of_keypoints(self, dataset, inds):
-        keypts_path = dataset.test_path
-        keypoints_location = np.fromfile(join(keypts_path, 'cloud_bin_{}'.format(inds[0]) + '.keypts.bin'), dtype=np.float32)
-        num_keypts = int(keypoints_location[0])
-        keypoints_location = keypoints_location[1:].reshape([num_keypts, 3])
-        pcd = dataset.input_points['test'][inds[0]]
-        kdtree = KDTree(pcd)
-        nndis, keypts_inds = kdtree.query(keypoints_location, 1)
-        return keypts_inds.reshape(5000)
 
     def generate_descriptor(self, model, dataset):
         self.sess.run(dataset.test_init_op)
@@ -206,67 +197,15 @@ class ModelTester:
         if not exists(detector_score_path):
             makedirs(detector_score_path)
 
+        t = []
         for i in range(dataset.num_test):
-            t = [time.time()]
+            stime = time.time()
             ops = [model.anchor_inputs, model.out_features, model.out_scores, model.anc_id, model.pos_id, model.anchor_keypoints_feat, model.positive_keypoints_feat, model.accuracy, model.anchor_inputs, model.positive_keypts_inds, model.anchor_keypts_inds, model.dists]
             [inputs, features, scores, anc_id, pos_id, anc_features, pos_features, accuracy, input, pos_key, anc_key, dist] = self.sess.run(ops, {model.dropout_prob: 1.0})
             keypts_loc = inputs['points'][0][anc_key]
-            print(accuracy)
-            print(anc_id)
-            all_trainable_vars = tf.trainable_variables()
-            for ii in range(len(all_trainable_vars)):
-                value = all_trainable_vars[ii].eval(session=self.sess)
-                nan_percentage = 100 * np.sum(np.isnan(value)) / np.prod(value.shape)
-                if nan_percentage > 0:
-                    print(all_trainable_vars[ii], nan_percentage)
-            t += [time.time()]
+            t += [time.time() - stime]
 
-            # # find keypts for each grid cell
-            # grid_size = 0.10 
-            # first_pcd_indices = inputs['in_batches'][0][:-1]
-            # points = inputs['backup_points'][first_pcd_indices]
-            # pts_min = points.min(axis=0)
-            # pts_max = points.max(axis=0)
-            # grid_shape = np.ceil( (pts_max - pts_min) / grid_size).astype(np.int)
-            
-            # indices = []
-            # for ii in range(grid_shape[0] * grid_shape[1] * grid_shape[2]):
-            #     indices.append([])
-
-            # for pts_ind, pts in enumerate(points):
-            #     ijk = np.ceil( (pts - pts_min) / grid_size).astype(np.int)
-            #     indices[(ijk[0] - 1) * grid_shape[1] * grid_shape[2] + (ijk[1] - 1) * grid_shape[2] + ijk[2] - 1].append(pts_ind)
-
-            # # for each grid, select one keypts
-            # keypts_ind = []
-            # for ii in range(grid_shape[0] * grid_shape[1] * grid_shape[2]):
-            #     if indices[ii] == []:
-            #         continue
-            #     grid_points = points[indices[ii]]
-            #     grid_scores = scores[indices[ii]]
-            #     # keypts_ind.append(np.random.choice(indices[ii]))
-            #     if np.max(grid_scores) > 0.25:
-            #         keypts_ind.append(indices[ii][np.argmax(grid_scores)])
-
-            # if len(keypts_ind) >= num_keypts:
-            #     selected_keypoints_id = np.random.choice(keypts_ind, num_keypts)
-            #     keypts_score = scores[selected_keypoints_id]
-            #     keypts_loc = inputs['points'][0][selected_keypoints_id]
-            #     anc_features = features[selected_keypoints_id]
-            # else:
-            #     # selecet keypoint using D2Net idea
-            #     scores_first_pcd = scores[inputs['in_batches'][0][:-1]]
-            #     scores_second_pcd = scores[inputs['in_batches'][1][:-1]]
-            #     # assert (scores_first_pcd == scores_second_pcd).sum() == scores_second_pcd.shape[0]
-            #     # print("Num points:", len(scores_first_pcd))
-            #     num_left = num_keypts - len(keypts_ind)
-            #     print("Random keypts:", num_left)
-            #     selected_keypoints_id = np.array(list(keypts_ind) + list(np.argsort(scores_first_pcd, axis=0)[-num_left:].squeeze(axis=1)))
-            #     keypts_score = scores[selected_keypoints_id]
-            #     keypts_loc = inputs['points'][0][selected_keypoints_id]
-            #     anc_features = features[selected_keypoints_id]
-
-            # selecet keypoint using D2Net idea
+            # selecet keypoint based on scores
             scores_first_pcd = scores[inputs['in_batches'][0][:-1]]
             scores_second_pcd = scores[inputs['in_batches'][1][:-1]]
             # assert (scores_first_pcd == scores_second_pcd).sum() == scores_second_pcd.shape[0]
@@ -299,6 +238,8 @@ class ModelTester:
             np.save(join(scorepath, 'cloud_bin_{}'.format(num_frag)), keypts_score.astype(np.float32))
             print("Generate cloud_bin_{0} for {1}".format(num_frag, scene))
             print("*" * 40)
+
+        print("Avergae Feature Extraction Time:", np.mean(t))
 
     def test_kitti(self, model, dataset):
         self.sess.run(dataset.test_init_op)

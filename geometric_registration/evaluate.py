@@ -4,16 +4,14 @@ import numpy as np
 import time
 import os
 from geometric_registration.utils import get_pcd, get_keypts, get_desc, loadlog
-# from scipy.spatial import KDTree
-from sklearn.neighbors import KDTree
-
+import cv2 
 
 def calculate_M(source_desc, target_desc):
     """
     Find the mutually closest point pairs in feature space.
     source and target are descriptor for 2 point cloud key points. [5000, 512]
     """
-    import cv2 
+
     new_sourceNNidx = []
     new_sourceNNdis = []
     bf_matcher = cv2.BFMatcher(cv2.NORM_L2)
@@ -34,16 +32,6 @@ def calculate_M(source_desc, target_desc):
         if new_targetNNidx[new_sourceNNidx[i]] == i:
             result.append([i, new_sourceNNidx[i]])
     return np.array(result)
-
-    # kdtree_s = KDTree(target_desc)
-    # sourceNNdis, sourceNNidx = kdtree_s.query(source_desc, 1)
-    # kdtree_t = KDTree(source_desc)
-    # targetNNdis, targetNNidx = kdtree_t.query(target_desc, 1)
-    # result = []
-    # for i in range(len(sourceNNidx)):
-    #     if targetNNidx[sourceNNidx[i]] == i:
-    #         result.append([i, sourceNNidx[i][0]])
-    # return np.array(result)
 
 
 def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logpath, gtLog, desc_name='ppf'):
@@ -82,12 +70,7 @@ def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logp
     else:
         # find mutually cloest point.
         corr = calculate_M(source_desc, target_desc)
-        if False:
-            from demo import show_registration
-            source_pcd = get_pcd(pcdpath, cloud_bin_s)
-            target_pcd = get_pcd(pcdpath, cloud_bin_t)
-            show_registration(source_pcd, target_pcd, source_desc, target_desc, source_keypts, target_keypts)
-
+        
         gtTrans = gtLog[key]
         frag1 = source_keypts[corr[:, 0]]
         frag2_pc = open3d.PointCloud()
@@ -102,20 +85,7 @@ def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logp
         inlier_ratio = num_inliers / len(distance)
         gt_flag = 1
 
-        # # draw result
-        # pcd1 = open3d.PointCloud()
-        # pcd1.points = open3d.utility.Vector3dVector(source_keypts)
-        # pcd2 = open3d.PointCloud()
-        # pcd2.points = open3d.utility.Vector3dVector(target_keypts)
-        # pcd2.translate([5, 0, 0])
-        # pcd1.paint_uniform_color([1, 0.706, 0])
-        # pcd2.paint_uniform_color([0, 0.651, 0.929])
-        # # open3d.draw_geometries([pcd1, pcd2])
-        # lineset = open3d.create_line_set_from_point_cloud_correspondences(pcd1, pcd2, corr[np.where(distance < 0.1)])
-        # lineset.paint_uniform_color([0, 0, 1])
-        # open3d.draw_geometries([pcd1, pcd2, lineset])
-        
-        # calculate the RMSE
+        # calculate the transformation matrix using RANSAC.
         source_pcd = open3d.PointCloud()
         source_pcd.points = open3d.utility.Vector3dVector(source_keypts)
         target_pcd = open3d.PointCloud()
@@ -193,7 +163,7 @@ if __name__ == '__main__':
        'sun3d-mit_76_studyroom-76-1studyroom2',
        'sun3d-mit_lab_hj-lab_hj_tea_nov_2_2012_scan1_erika'
     ]
-    # desc_name = 'kpconv'
+    # TODO: change it to my detector name.
     desc_name = sys.argv[1]
     timestr = sys.argv[2]
     # inlier_ratio = float(sys.argv[3])
@@ -208,6 +178,7 @@ if __name__ == '__main__':
     pool.close()
     pool.join()
 
+    # collect all the data and print the results.
     inliers_list = []
     recall_list = []
     inliers_ratio_list = []
@@ -242,7 +213,7 @@ if __name__ == '__main__':
 
     print("*" * 40)
     print(recall_list)
-    print(f"Avergae Matching Recall: {pred_match / gt_match * 100}%")
+    # print(f"True Avarage Recall: {pred_match / gt_match * 100}%")
     print(f"Matching Recall Std: {np.std(recall_list)}")
     average_recall = sum(recall_list) / len(recall_list)
     print(f"All 8 scene, average recall: {average_recall}%")
