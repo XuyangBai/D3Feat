@@ -19,6 +19,7 @@ geometric_registration_eth/pred_result/*
 geometric_registration_eth/kpconv_*
 geometric_registration_eth/SHOT/*
 geometric_registration_eth/FPFH/*
+*_back.py
 *.pyc
 *.so
 *.o
