@@ -80,7 +80,7 @@ def get_at_indices(tensor, indices):
     return tf.gather_nd(tensor, tf.stack((counter, indices), -1))
 
 
-def batch_hard(dists, pids, pos_margin=0,1, neg_margin=1.4, batch_precision_at_k=None):
+def desc_loss(dists, pids, pos_margin=0.1, neg_margin=1.4, batch_precision_at_k=None):
     """Computes the contrastive loss.
 
     Args:
@@ -92,7 +92,7 @@ def batch_hard(dists, pids, pos_margin=0,1, neg_margin=1.4, batch_precision_at_k
     Returns:
         A 1D tensor of shape (B,) containing the loss value for each sample.
     """
-    with tf.name_scope("batch_hard"):
+    with tf.name_scope("desc_loss"):
         same_identity_mask = tf.equal(tf.expand_dims(pids, axis=1),
                                       tf.expand_dims(pids, axis=0))
         negative_mask = tf.logical_not(same_identity_mask)
@@ -101,12 +101,12 @@ def batch_hard(dists, pids, pos_margin=0,1, neg_margin=1.4, batch_precision_at_k
 
         furthest_positive = tf.reduce_max(dists * tf.cast(same_identity_mask, tf.float32), axis=1)
         # closest_negative = tf.map_fn(lambda x: tf.reduce_min(tf.boolean_mask(x[0], x[1])), (dists, negative_mask), tf.float32)
-        closest_negative = tf.reduce_min(dists + 1e5*tf.cast(same_identity_mask, tf.float32), axis=1)
+        closest_negative = tf.reduce_min(dists + 1e5 * tf.cast(same_identity_mask, tf.float32), axis=1)
         # Another way of achieving the same, though more hacky:
         # closest_negative_col = tf.reduce_min(dists + 1e5*tf.cast(same_identity_mask, tf.float32), axis=1)
         # closest_negative_row = tf.reduce_min(dists + 1e5*tf.cast(same_identity_mask, tf.float32), axis=0)
         # closest_negative = tf.minimum(closest_negative_col, closest_negative_row)
-        
+
         diff = furthest_positive - closest_negative
         # calculate average diff to monitor the training
         # average_diff = tf.reduce_min(diff)
@@ -114,15 +114,9 @@ def batch_hard(dists, pids, pos_margin=0,1, neg_margin=1.4, batch_precision_at_k
         average_diff = tf.reduce_mean(furthest_positive - average_negative)
         # accuracy = tf.count_nonzero(tf.greater_equal(0., diff), dtype=tf.int64) / tf.shape(diff)[0]
         accuracy = tf.reduce_sum(tf.cast(tf.greater_equal(0., diff), tf.float32)) / tf.cast(tf.shape(diff)[0], tf.float32)
-        if isinstance(margin, numbers.Real):
-            # diff = tf.maximum(diff + margin, 0.0)
-            diff = tf.maximum(furthest_positive - pos_margin, 0.0) + tf.maximum(neg_margin - closest_negative, 0.0)
-        elif margin == 'soft':
-            diff = tf.nn.softplus(diff)
-        elif margin.lower() == 'none':
-            pass    
-        else:
-            raise NotImplementedError('The margin {} is not implemented in batch_hard'.format(margin))
+
+        # contrastive loss
+        diff = tf.maximum(furthest_positive - pos_margin, 0.0) + tf.maximum(neg_margin - closest_negative, 0.0)
 
     if batch_precision_at_k is None:
         # tf.summary.scalar('loss', tf.reduce_mean(diff))
@@ -165,118 +159,21 @@ def batch_hard(dists, pids, pos_margin=0,1, neg_margin=1.4, batch_precision_at_k
 
         return diff, top1, prec_at_k, topk_is_same, negative_dists, positive_dists
 
-def repeat_loss(dists, score1, score2, pids, margin):
-    with tf.name_scope("repeatable_loss"):
+
+def det_loss(dists, score1, score2, pids):
+    with tf.name_scope("det_loss"):
         same_identity_mask = tf.equal(tf.expand_dims(pids, axis=1), tf.expand_dims(pids, axis=0))
-        negative_mask = tf.logical_not(same_identity_mask)
-        # positive_mask = tf.logical_xor(same_identity_mask,
-        #                              tf.eye(tf.shape(pids)[0], dtype=tf.bool))
 
         furthest_positive = tf.reduce_max(dists * tf.cast(same_identity_mask, tf.float32), axis=1)
-        # closest_negative = tf.map_fn(lambda x: tf.reduce_min(tf.boolean_mask(x[0], x[1])), (dists, negative_mask), tf.float32)
-        # Another way of achieving the same, though more hacky:
-        closest_negative = tf.reduce_min(dists + 1e5*tf.cast(same_identity_mask, tf.float32), axis=1)
+        closest_negative = tf.reduce_min(dists + 1e5 * tf.cast(same_identity_mask, tf.float32), axis=1)
 
-        diff1 = tf.expand_dims(furthest_positive - closest_negative, 1)
-        loss1 = tf.reduce_mean(diff1 * (score1 + score2 + 1e-6))
-        # loss1 = tf.Print(loss1, [loss1], message="my loss1")
-        return loss1 
+        diff = tf.expand_dims(furthest_positive - closest_negative, 1)
+        score_loss = tf.reduce_mean(diff * (score1 + score2 + 1e-6))
+        # score_loss = tf.Print(score_loss, [score_loss], message="score_loss")
+        return score_loss
 
-        # score_diff = tf.nn.l2_normalize(score1) * tf.nn.l2_normalize(score2)
-        # score_loss = tf.maximum(1 - tf.reduce_sum(score_diff), 0)
-        # score_loss = tf.Print(score_loss, [score_loss], message="score loss")
-        # return score_loss
-
-        # descriptor_ratio = tf.divide(furthest_positive, closest_negative) # [0, inf]
-        # descriptor_ratio = tf.minimum(descriptor_ratio, 1) # [0, 1]
-        # detector_ratio = 1 - tf.scalar_mul(0.5, score1 + score2) # [0, 1]
-        # descriptor_ratio = tf.expand_dims(descriptor_ratio, 1)
-        # # descriptor_ratio = tf.Print(descriptor_ratio, [tf.shape(descriptor_ratio)], message='descriptor_ratio')
-        # # detector_ratio = tf.Print(detector_ratio, [tf.shape(detector_ratio)], message='detector_ratio')
-        # # assert tf.shape(descriptor_ratio) == tf.shape(detector_ratio)
-        # similarity = 1 - tf.reduce_sum(tf.multiply(descriptor_ratio, detector_ratio))
-        # # similarity = tf.losses.cosine_distance(descriptor_ratio, detector_ratio, axis=1)
-        # similarity = tf.Print(similarity, [descriptor_ratio, detector_ratio, tf.shape(similarity), similarity], message="similarity loss")
-        # return tf.reduce_mean(similarity)
-
-        # diff = tf.expand_dims(tf.maximum(furthest_positive - 0.1, 0.0) + tf.maximum(1.4 - closest_negative, 0.0), 1)
-        # weight = tf.multiply(score1 + 1.0, score2 + 1.0)
-        # weight_sum = tf.reduce_sum(weight) + 1e-6
-        # loss = tf.reduce_sum(weight * diff) / weight_sum
-        # return loss
-
-def repeat_loss2(dists, score1, score2, pids, margin):
-    # TODO: use cause NaN errors.
-    with tf.name_scope("confidence_loss"):
-        same_identity_mask = tf.equal(tf.expand_dims(pids, axis=1), tf.expand_dims(pids, axis=0))
-        negative_mask = tf.logical_not(same_identity_mask)
-        furthest_positive = tf.reduce_max(dists * tf.cast(same_identity_mask, tf.float32), axis=1)
-        conf_loss = (score1 + score2) * (furthest_positive)
-        conf_loss = tf.reduce_mean(conf_loss)
-        conf_loss = tf.Print(conf_loss, [conf_loss], message='confidence loss')
-
-    with tf.name_scope("repeatable_loss2"):
-        # same_identity_mask = tf.equal(tf.expand_dims(pids, axis=1), tf.expand_dims(pids, axis=0))
-        # negative_mask = tf.logical_not(same_identity_mask)
-        # furthest_positive = tf.reduce_max(dists * tf.cast(same_identity_mask, tf.float32), axis=1)
-        # closest_negative = tf.reduce_min(dists + 1e5*tf.cast(same_identity_mask, tf.float32), axis=1)
-        # diff = furthest_positive - closest_negative
-        # weight = tf.cast(tf.less_equal(diff + 0, 0), tf.float32)
-        # weight = tf.expand_dims(weight, 1)
-        assert (score1 - score2).shape == (score1 * score2).shape
-        # loss = tf.reduce_mean((tf.divide((score1 - score2) * weight, score1 * score2 + 1e-10)) ** 2)
-        loss = tf.reduce_mean((score1 - score2) ** 2)
-        loss = tf.Print(loss, [loss], message='score loss')
-        return conf_loss
-
-def dynamic_margin(dists, pids, margin):
-    from tensorflow.python.training.moving_averages import assign_moving_average
-    same_identity_mask = tf.equal(tf.expand_dims(pids, axis=1), tf.expand_dims(pids, axis=0))
-    negative_mask = tf.logical_not(same_identity_mask)
-    furthest_positive = tf.reduce_max(dists * tf.cast(same_identity_mask, tf.float32), axis=1)
-    closest_negative = tf.map_fn(lambda x: tf.reduce_min(tf.boolean_mask(x[0], x[1])), (dists, negative_mask), tf.float32)
-    # closest_negative_col = tf.map_fn(lambda x: tf.reduce_min(tf.boolean_mask(x[0], x[1])), (dists, negative_mask), tf.float32)
-    # closest_negative_col = tf.reduce_min(dists + 1e5*tf.cast(same_identity_mask, tf.float32), axis=1)
-    # closest_negative_row = tf.reduce_min(dists + 1e5*tf.cast(same_identity_mask, tf.float32), axis=0)
-    # closest_negative = tf.minimum(closest_negative_col, closest_negative_row)
-
-    diff = furthest_positive - closest_negative
-    average_negative = tf.map_fn(lambda x: tf.reduce_mean(tf.boolean_mask(x[0], x[1])), (dists, negative_mask), tf.float32)
-    average_diff = tf.reduce_mean(furthest_positive - average_negative)
-    accuracy = tf.count_nonzero(tf.greater_equal(0., diff), dtype=tf.int32) / tf.shape(diff)[0]
-
-    hist_width = 200
-    decay = 0.99
-    with tf.variable_scope('dynamic_margin_loss', reuse=tf.AUTO_REUSE):
-        pos_moving_pdf = tf.get_variable('pos_pdf', (hist_width,), initializer=tf.constant_initializer([1. / float(hist_width)] * hist_width), trainable=False)
-        neg_moving_pdf = tf.get_variable('neg_pdf', (hist_width,), initializer=tf.constant_initializer([1. / float(hist_width)] * hist_width), trainable=False)
-    # hist = tf.histogram_fixed_width(diff, [-2,2], nbins=hist_width)
-    # pdf = tf.to_float(hist) / tf.to_float(tf.size(pids))
-    # decay = 0.99
-    # with tf.control_dependencies([assign_moving_average(moving_pdf, pdf, decay)]):
-    #     cdf = tf.to_float(tf.cumsum(tf.identity(moving_pdf)))
-    # b_size = tf.minimum(tf.to_int32(tf.round( (diff + 2) / (4. / hist_width))), int(hist_width) - 1)
-    # weight = tf.gather(cdf, b_size)
-    pos_hist = tf.histogram_fixed_width(furthest_positive, [-2, 2], nbins=hist_width)
-    pos_pdf = tf.to_float(pos_hist) / tf.to_float(tf.size(pids))
-    with tf.control_dependencies([assign_moving_average(pos_moving_pdf, pos_pdf, decay)]):
-        pos_cdf = tf.to_float(tf.cumsum(tf.identity(pos_moving_pdf)))
-    b_size = tf.minimum(tf.to_int32(tf.round( (furthest_positive + 2) / (4. / hist_width))), int(hist_width) - 1)
-    pos_weight = tf.gather(pos_cdf, b_size)
-
-    neg_hist = tf.histogram_fixed_width(closest_negative, [-2, 2], nbins=hist_width)
-    neg_pdf = tf.to_float(neg_hist) / tf.to_float(tf.size(pids))
-    with tf.control_dependencies([assign_moving_average(neg_moving_pdf, neg_pdf, decay)]):
-        neg_cdf = tf.to_float(tf.cumsum(tf.identity(neg_moving_pdf)))
-    b_size = tf.minimum(tf.to_int32(tf.round( (closest_negative + 2) / (4. / hist_width))), int(hist_width) - 1)
-    neg_weight = tf.gather(neg_pdf, b_size)
-
-    # loss = weight * diff
-    loss = neg_weight * closest_negative + pos_weight * furthest_positive
-    return tf.reduce_mean(loss), accuracy, average_diff
 
 LOSS_CHOICES = {
-    'batch_hard': batch_hard,
-    'repeat_loss': repeat_loss,
-    'dynamic_margin': dynamic_margin,
+    'desc_loss': desc_loss,
+    'det_loss': det_loss,
 }

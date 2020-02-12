@@ -153,12 +153,12 @@ class KernelPointFCNN:
             mask = tf.logical_and(false_negative_mask, tf.logical_not(same_identity_mask))
             self.dists += tf.scalar_mul(10, tf.cast(mask, tf.float32))
             # calculate the contrastive loss using the dist
-            self.desc_loss, self.accuracy, self.average_dist = LOSS_CHOICES['batch_hard'](self.dists, positiveIDS)
+            self.desc_loss, self.accuracy, self.average_dist = LOSS_CHOICES['desc_loss'](self.dists, positiveIDS)
             # calculate the score loss.
             if config.det_loss_weight != 0:
                 self.anchor_scores = tf.gather(self.out_scores, self.anchor_keypts_inds)
                 self.positve_scores = tf.gather(self.out_scores, self.positive_keypts_inds)
-                self.det_loss = LOSS_CHOICES['det_loss'](self.dists, self.anchor_scores, self.positve_scores, positiveIDS, margin=1)
+                self.det_loss = LOSS_CHOICES['det_loss'](self.dists, self.anchor_scores, self.positve_scores, positiveIDS)
                 self.det_loss = tf.scalar_mul(self.config.det_loss_weight, self.det_loss)
             else:
                 self.det_loss = tf.constant(0, dtype=self.desc_loss.dtype)

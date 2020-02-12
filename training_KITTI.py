@@ -43,10 +43,10 @@ class KITTIConfig(Config):
                     'resnetb_strided',
                     'resnetb',
                     'resnetb_strided',
-                    'resnetb', 
-                    'resnetb_strided', 
-                    'resnetb', 
-                    'resnetb_strided', 
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
+                    'resnetb_strided',
                     'resnetb',
                     'nearest_upsample',
                     'unary',
@@ -57,7 +57,6 @@ class KITTIConfig(Config):
                     'nearest_upsample',
                     'unary',
                     'last_unary']
-                    ]
 
     # KPConv specific parameters
     num_kernel_points = 15
@@ -76,8 +75,8 @@ class KITTIConfig(Config):
     # Can the network learn modulations in addition to deformations
     modulated = False
 
-    # repeat loss
-    repeat_loss_weight = 1
+    # detector loss weight
+    det_loss_weight = 1
 
     # Offset loss
     # 'permissive' only constrains offsets inside the big radius
@@ -193,7 +192,7 @@ if __name__ == '__main__':
     # Trainer class
     trainer = ModelTrainer(model)
     # trainer = ModelTrainer(model, restore_snap='results_kitti/Log_/snapshots/snap-')
-   
+
     t2 = time.time()
 
     print('\n----------------')

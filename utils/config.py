@@ -29,7 +29,7 @@ class Config:
     # parameter added.
     gpu_id = 0
     keypts_num = 16
-    repeat_loss_weight = 0
+    det_loss_weight = 0
     safe_radius = 0.10
 
     # Dataset name

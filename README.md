@@ -68,7 +68,7 @@ python test_3dmatch.py
 The descriptors and detection scores for each point will be generated and saved in `geometric_registration` folder. Then the `feature matching recall` and `inlier ratio` can be caluclated by running
 ```bash
 cd geometric_registration/
-python evaluate.py kpconv [timestr of the model]
+python evaluate.py JDKDD [timestr of the model]
 ```
 The `registration recall` can be calculated by running the `evaluate.m` in `geometric_registration/3dmatch` which are provided by [3DMatch.](https://github.com/andyzeng/3dmatch-toolbox/tree/master/evaluation/geometric-registration)
 
@@ -88,13 +88,13 @@ python test_KITTI.py
 For keypoint repeatability, after generating the descriptors and detection scores, then run
 
 ```bash
-python evaluate_3dmatch_our.py kpconv [timestr of the model]
+python evaluate_3dmatch_our.py JDKDD [timestr of the model]
 ```
 
 or
 
 ```bash
-python evaluate_kitti_our.py kpconv [timestr of the model]
+python evaluate_kitti_our.py JDKDD [timestr of the model]
 ```
 
 
@@ -105,4 +105,4 @@ The pretrained model of 3DMatch are in `results/` while the pretrained model of 
 
 ## TODO
 - create a requirement.txt
-- Change the detector name from kpconv to our.
+- Change the detector name from JDKDD to our.

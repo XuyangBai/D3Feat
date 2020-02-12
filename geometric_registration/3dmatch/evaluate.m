@@ -5,7 +5,7 @@
 % https://github.com/qianyizh/ElasticReconstruction/tree/master/Matlab_Toolbox
 
 
-descriptorName = 'kpconv_'; % 3dmatch, spin, fpfh
+descriptorName = 'JDKDD_'; % 3dmatch, spin, fpfh
 
 % Locations of evaluation files
 dataPath = '../log_result';

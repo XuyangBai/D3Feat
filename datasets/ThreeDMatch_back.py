@@ -32,7 +32,6 @@ from sklearn.neighbors import KDTree
 
 # PLY reader
 from utils.ply import read_ply, write_ply
-from utils.mesh import rasterize_mesh
 
 # OS functions
 from os import makedirs, listdir
@@ -65,7 +64,7 @@ def rotate(points, num_axis=1):
         return points
     else:
         theta = np.random.rand() * 2 * np.pi
-        axis = 0 
+        axis = 0
         c, s = np.cos(theta), np.sin(theta)
         R = np.array([[c, -s, -s], [s, c, -s], [s, s, c]], dtype=np.float32)
         R[:, axis] = 0
@@ -91,6 +90,7 @@ def rotate(points, num_axis=1):
         R[axis, axis] = 1
         points = np.matmul(points, R)
         return points
+
 
 def grid_subsampling(points, features=None, labels=None, sampleDl=0.1, verbose=0):
     """
@@ -147,7 +147,7 @@ class ThreeDMatchDataset(Dataset):
         ##########################
         # Parameters for the files
         ##########################
-        
+
         # Initiate containers
         self.anc_points = {'train': [], 'val': [], 'test': []}
         self.pos_points = {'train': [], 'val': [], 'test': []}
@@ -172,8 +172,8 @@ class ThreeDMatchDataset(Dataset):
         # pos_keypts_filename = join(pklpath, '{}_{:.3f}_pos_keypts.pkl'.format(split, 0.03))
         # pos_points_filename = join(self.writepath, '{}_{:.3f}_pos_points.pkl'.format(split, self.downsample))
         if split == 'train':
-            self.files = {'train':[], 'test':[], 'val':[]}
-            self.DATA_FILES  = {
+            self.files = {'train': [], 'test': [], 'val': []}
+            self.DATA_FILES = {
                 'train': '../FCGF/config/train_3dmatch.txt',
                 'val': '../FCGF/config/val_3dmatch.txt',
                 'test': '../FCGF/config/test_3dmatch.txt'
@@ -265,7 +265,7 @@ class ThreeDMatchDataset(Dataset):
             print(gen_indices)
             # Generator loop
             for p_i in gen_indices:
-                
+
                 if split == 'test':
                     anc_id = self.ids_list[split][p_i]
                     pos_id = self.ids_list[split][p_i]
@@ -273,9 +273,9 @@ class ThreeDMatchDataset(Dataset):
                     # anc_id = list(self.anc_to_pos[split].keys())[p_i]
                     # import random
                     # if random.random() > 0.75:
-                        # pos_id = self.anc_to_pos[split][anc_id][0]
+                    # pos_id = self.anc_to_pos[split][anc_id][0]
                     # else:
-                        # pos_id = random.choice(self.anc_to_pos[split][anc_id])
+                    # pos_id = random.choice(self.anc_to_pos[split][anc_id])
                     # anc_id = self.files[split][p_i][0]
                     anc_id = [*self.anc_to_pos[split].keys()][p_i]
                     import random
@@ -309,22 +309,22 @@ class ThreeDMatchDataset(Dataset):
                 backup_pos_points = pos_points
 
                 n = anc_points.shape[0] + pos_points.shape[0]
-                    
-                if split == 'test': # for test, use all 5000 the anc_keypts 
+
+                if split == 'test':  # for test, use all 5000 the anc_keypts
                     anc_keypts = self.anc_keypts[split][anc_ind].astype(np.int32)
                     pos_keypts = self.pos_keypts[split][pos_ind].astype(np.int32)
                     assert (np.array_equal(anc_keypts, pos_keypts))
                     anc_keypts = anc_keypts
                     pos_keypts = anc_keypts + len(anc_points)
                     # pos_keypts = self.pos_keypts[split][ind].astype(np.int32) + len(anc_points)
-                    assert(np.array_equal(anc_points, pos_points))
-                    assert(np.array_equal(anc_keypts, pos_keypts - len(anc_points)))
+                    assert (np.array_equal(anc_points, pos_points))
+                    assert (np.array_equal(anc_keypts, pos_keypts - len(anc_points)))
                 else:
                     # here the anc_keypts and pos_keypts is useless
                     # anc_keypts = np.random.choice(len(anc_points), 10)
                     # pos_keypts = np.random.choice(len(pos_points), 10)
                     # if anc_points.shape[0] > 60000 or pos_points.shape[0] > 60000:
-                        # continue
+                    # continue
                     if anc_points.shape[0] < 2000 or pos_points.shape[0] < 2000:
                         continue
 
@@ -350,7 +350,7 @@ class ThreeDMatchDataset(Dataset):
                         anc_keypts = np.array(anc_ind)
                         pos_keypts = np.array(pos_ind)
                         pos_keypts = pos_keypts + len(anc_points)
-                    
+
                     # No matter how many num_keypts are used for training, test only use 64 pair.
                     if len(anc_keypts) >= config.keypts_num:
                         if split == 'train':
@@ -359,19 +359,18 @@ class ThreeDMatchDataset(Dataset):
                             selected_ind = np.random.choice(range(len(anc_keypts)), 64, replace=False)
                         anc_keypts = anc_keypts[selected_ind]
                         pos_keypts = pos_keypts[selected_ind]
-                    else: # if can not build enough correspondence, then skip this fragments pair.
+                    else:  # if can not build enough correspondence, then skip this fragments pair.
                         continue
-                    
 
                     # data augmentations: noise
                     anc_noise = np.random.rand(anc_points.shape[0], 3) * config.augment_noise
                     pos_noise = np.random.rand(pos_points.shape[0], 3) * config.augment_noise
-                    anc_points += anc_noise 
+                    anc_points += anc_noise
                     pos_points += pos_noise
                     # data augmentations: rotation
                     anc_points = rotate(anc_points, num_axis=config.augment_rotation)
                     pos_points = rotate(pos_points, num_axis=config.augment_rotation)
-                
+
                 # Add data to current batch
                 anc_points_list += [anc_points]
                 anc_keypts_list += [anc_keypts]
@@ -382,14 +381,14 @@ class ThreeDMatchDataset(Dataset):
                 ti_list += [p_i]
                 ti_list_pos += [p_i]
 
-                yield (np.concatenate(anc_points_list + pos_points_list, axis=0), # anc_points
-                        np.concatenate(anc_keypts_list, axis=0),     # anc_keypts
-                        np.concatenate(pos_keypts_list, axis=0),    
-                        np.array(ti_list + ti_list_pos, dtype=np.int32),       # anc_obj_index
-                        np.array([tp.shape[0] for tp in anc_points_list] + [tp.shape[0] for tp in pos_points_list]), # anc_stack_length 
-                        np.array([anc_id, pos_id]),
-                        np.concatenate(backup_anc_points_list + backup_pos_points_list, axis=0)
-                )
+                yield (np.concatenate(anc_points_list + pos_points_list, axis=0),  # anc_points
+                       np.concatenate(anc_keypts_list, axis=0),  # anc_keypts
+                       np.concatenate(pos_keypts_list, axis=0),
+                       np.array(ti_list + ti_list_pos, dtype=np.int32),  # anc_obj_index
+                       np.array([tp.shape[0] for tp in anc_points_list] + [tp.shape[0] for tp in pos_points_list]),  # anc_stack_length
+                       np.array([anc_id, pos_id]),
+                       np.concatenate(backup_anc_points_list + backup_pos_points_list, axis=0)
+                       )
                 # print("\t Yield ", anc_id, pos_id)
                 anc_points_list = []
                 pos_points_list = []
@@ -409,22 +408,23 @@ class ThreeDMatchDataset(Dataset):
         # Generator types and shapes
         # gen_types = (tf.float32, tf.int32, tf.int32, tf.int32,  tf.float32, tf.int32, tf.int32, tf.int32)
         # gen_shapes = ([None, 3], [None], [None], [None], [None, 3], [None], [None], [None])
-        gen_types = (tf.float32, tf.int32, tf.int32,  tf.int32, tf.int32, tf.string, tf.float32)
+        gen_types = (tf.float32, tf.int32, tf.int32, tf.int32, tf.int32, tf.string, tf.float32)
         gen_shapes = ([None, 3], [None], [None], [None], [None], [None], [None, 3])
 
         return random_balanced_gen, gen_types, gen_shapes
 
     def get_tf_mapping(self, config):
-        
+
         def tf_map(anc_points, anc_keypts, pos_keypts, obj_inds, stack_lengths, ply_id, backup_points):
             batch_inds = self.tf_get_batch_inds(stack_lengths)
             stacked_features = tf.ones((tf.shape(anc_points)[0], 1), dtype=tf.float32)
             anchor_input_list = self.tf_descriptor_input(config,
-                                        anc_points,
-                                        stacked_features,
-                                        stack_lengths,
-                                        batch_inds)
+                                                         anc_points,
+                                                         stacked_features,
+                                                         stack_lengths,
+                                                         batch_inds)
             return anchor_input_list + [stack_lengths, anc_keypts, pos_keypts, ply_id, backup_points]
+
         return tf_map
 
     def prepare_geometry_registration(self):

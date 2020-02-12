@@ -182,9 +182,9 @@ class ModelTester:
             self.experiment_str = self.experiment_str + '-rand'
         else:
             self.experiment_str = self.experiment_str + '-pred'
-        descriptor_path = f'geometric_registration/kpconv_{self.experiment_str}/descriptors'
-        keypoint_path = f'geometric_registration/kpconv_{self.experiment_str}/keypoints'
-        score_path = f'geometric_registration/kpconv_{self.experiment_str}/scores'
+        descriptor_path = f'geometric_registration/JDKDD_{self.experiment_str}/descriptors'
+        keypoint_path = f'geometric_registration/JDKDD_{self.experiment_str}/keypoints'
+        score_path = f'geometric_registration/JDKDD_{self.experiment_str}/scores'
         if not exists(descriptor_path):
             makedirs(descriptor_path)
         if not exists(keypoint_path):

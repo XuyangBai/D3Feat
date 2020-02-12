@@ -75,8 +75,8 @@ class ThreeDMatchConfig(Config):
     # Can the network learn modulations in addition to deformations
     modulated = False
 
-    # repeat loss
-    repeat_loss_weight = 1
+    # detector loss weight
+    det_loss_weight = 1
 
     # Offset loss
     # 'permissive' only constrains offsets inside the big radius
