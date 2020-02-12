@@ -1,4 +1,3 @@
-
 # Basic libs
 import os
 import tensorflow as tf
@@ -8,62 +7,36 @@ import glob
 import random
 import pickle
 import copy
-import open3d as o3d
-from sklearn.neighbors import KDTree
-
-# PLY reader
-from utils.ply import read_ply, write_ply
-from utils.mesh import rasterize_mesh
-
-# OS functions
-from os import makedirs, listdir
-from os.path import exists, join, isfile, isdir
-import os.path as path
+import open3d
 
 # Dataset parent class
 from datasets.common import Dataset
-
-# Subsampling extension
-import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
-
+from datasets.ThreeDMatch import rotate
 
 kitti_icp_cache = {}
 kitti_cache = {}
 
-def rotate(points, num_axis=1):
-    if num_axis == 1:
-        theta = np.random.rand() * np.pi * 2
-        # axis = np.random.randint(3)
-        # Only rotate around z axis.
-        axis = 2
-        c, s = np.cos(theta), np.sin(theta)
-        R = np.array([[c, -s, -s], [s, c, -s], [s, s, c]], dtype=np.float32)
-        R[:, axis] = 0
-        R[axis, :] = 0
-        R[axis, axis] = 1
-        points = np.matmul(points, R)
-        return points
-    else:
-        return points
 
 def make_open3d_point_cloud(xyz, color=None):
-    pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(xyz)
+    pcd = open3d.geometry.PointCloud()
+    pcd.points = open3d.utility.Vector3dVector(xyz)
     if color is not None:
-        pcd.colors = o3d.utility.Vector3dVector(color)
+        pcd.colors = open3d.utility.Vector3dVector(color)
     return pcd
 
+
 def make_open3d_feature(data, dim, npts):
-    feature = o3d.registration.Feature()
+    feature = open3d.registration.Feature()
     feature.resize(dim, npts)
     feature.data = data.astype('d').transpose()
     return feature
+
 
 def get_matching_indices(source, target, trans, search_voxel_size, K=None):
     source_copy = copy.deepcopy(source)
     target_copy = copy.deepcopy(target)
     source_copy.transform(trans)
-    pcd_tree = o3d.geometry.KDTreeFlann(target_copy)
+    pcd_tree = open3d.geometry.KDTreeFlann(target_copy)
 
     match_inds = []
     for i, point in enumerate(source_copy.points):
@@ -74,12 +47,13 @@ def get_matching_indices(source, target, trans, search_voxel_size, K=None):
             match_inds.append((i, j))
     return match_inds
 
+
 class KITTIDataset(Dataset):
     AUGMENT = None
     DATA_FILES = {
-      'train': '../FCGF/config/train_kitti.txt',
-      'val': '../FCGF/config/val_kitti.txt',
-      'test': '../FCGF/config/test_kitti.txt'
+        'train': 'data/kitti/config/train_kitti.txt',
+        'val': 'data/kitti/config/val_kitti.txt',
+        'test': 'data/kitti/config/test_kitti.txt'
     }
     TEST_RANDOM_ROTATION = False
     IS_ODOMETRY = True
@@ -90,8 +64,8 @@ class KITTIDataset(Dataset):
         self.network_model = 'descriptor'
         self.num_threads = input_threads
         self.load_test = load_test
-        self.root = '../FCGF/data/kitti/'
-        self.icp_path = '../FCGF/data/kitti/icp'
+        self.root = 'data/kitti/'
+        self.icp_path = 'data/kitti/icp'
         self.voxel_size = first_subsampling_dl
         self.matching_search_voxel_size = first_subsampling_dl * 1.5
 
@@ -104,7 +78,7 @@ class KITTIDataset(Dataset):
         else:
             self.prepare_kitti_ply(split='train')
             self.prepare_kitti_ply(split='val')
-    
+
     def prepare_kitti_ply(self, split='train'):
         max_time_diff = self.MAX_TIME_DIFF
         subset_names = open(self.DATA_FILES[split]).read().split()
@@ -117,7 +91,7 @@ class KITTIDataset(Dataset):
             all_odo = self.get_video_odometry(drive_id, return_all=True)
             all_pos = np.array([self.odometry_to_positions(odo) for odo in all_odo])
             Ts = all_pos[:, :3, 3]
-            pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3))**2
+            pdist = (Ts.reshape(1, -1, 3) - Ts.reshape(-1, 1, 3)) ** 2
             pdist = np.sqrt(pdist.sum(-1))
             more_than_10 = pdist > 10
             curr_time = inames[0]
@@ -127,7 +101,7 @@ class KITTIDataset(Dataset):
                     curr_time += 1
                 else:
                     next_time = next_time[0] + curr_time - 1
-                
+
                 if next_time in inames:
                     self.files[split].append((drive_id, curr_time, next_time))
                     curr_time = next_time + 1
@@ -187,7 +161,6 @@ class KITTIDataset(Dataset):
             print(gen_indices)
             # Generator loop
             for p_i in gen_indices:
-                
 
                 if split == 'test':
                     aligned_anc_points, aligned_pos_points, anc_points, pos_points, matches, trans, flag = self.__getitem__(split, p_i)
@@ -219,7 +192,7 @@ class KITTIDataset(Dataset):
                     # data augmentations: noise
                     anc_noise = np.random.rand(anc_points.shape[0], 3) * config.augment_noise
                     pos_noise = np.random.rand(pos_points.shape[0], 3) * config.augment_noise
-                    anc_points += anc_noise 
+                    anc_points += anc_noise
                     pos_points += pos_noise
                     # data augmentations: rotation
                     anc_points = rotate(anc_points, num_axis=config.augment_rotation)
@@ -242,15 +215,15 @@ class KITTIDataset(Dataset):
                 ti_list += [p_i]
                 ti_list_pos += [p_i]
 
-                yield (np.concatenate(anc_points_list + pos_points_list, axis=0), # anc_points
-                        np.concatenate(anc_keypts_list, axis=0),     # anc_keypts
-                        np.concatenate(pos_keypts_list, axis=0),    
-                        np.array(ti_list + ti_list_pos, dtype=np.int32),       # anc_obj_index
-                        np.array([tp.shape[0] for tp in anc_points_list] + [tp.shape[0] for tp in pos_points_list]), # anc_stack_length 
-                        np.array([anc_id, pos_id]),
-                        np.concatenate(backup_anc_points_list + backup_pos_points_list, axis=0),
-                        np.array(trans)
-                )
+                yield (np.concatenate(anc_points_list + pos_points_list, axis=0),  # anc_points
+                       np.concatenate(anc_keypts_list, axis=0),  # anc_keypts
+                       np.concatenate(pos_keypts_list, axis=0),
+                       np.array(ti_list + ti_list_pos, dtype=np.int32),  # anc_obj_index
+                       np.array([tp.shape[0] for tp in anc_points_list] + [tp.shape[0] for tp in pos_points_list]),  # anc_stack_length 
+                       np.array([anc_id, pos_id]),
+                       np.concatenate(backup_anc_points_list + backup_pos_points_list, axis=0),
+                       np.array(trans)
+                       )
                 # print("\t Yield ", anc_id, pos_id)
                 anc_points_list = []
                 pos_points_list = []
@@ -264,7 +237,7 @@ class KITTIDataset(Dataset):
                 # time.sleep(0.3)
 
         # Generator types and shapes
-        gen_types = (tf.float32, tf.int32, tf.int32,  tf.int32, tf.int32, tf.string, tf.float32, tf.float32)
+        gen_types = (tf.float32, tf.int32, tf.int32, tf.int32, tf.int32, tf.string, tf.float32, tf.float32)
         gen_shapes = ([None, 3], [None], [None], [None], [None], [None], [None, 3], [4, 4])
 
         return random_balanced_gen, gen_types, gen_shapes
@@ -274,20 +247,20 @@ class KITTIDataset(Dataset):
             batch_inds = self.tf_get_batch_inds(stack_lengths)
             stacked_features = tf.ones((tf.shape(anc_points)[0], 1), dtype=tf.float32)
             anchor_input_list = self.tf_descriptor_input(config,
-                                        anc_points,
-                                        stacked_features,
-                                        stack_lengths,
-                                        batch_inds)
+                                                         anc_points,
+                                                         stacked_features,
+                                                         stack_lengths,
+                                                         batch_inds)
             return anchor_input_list + [stack_lengths, anc_keypts, pos_keypts, ply_id, backup_points, trans]
+
         return tf_map
 
-    
     def get_all_scan_ids(self, drive_id):
         if self.IS_ODOMETRY:
             fnames = glob.glob(self.root + '/sequences/%02d/velodyne/*.bin' % drive_id)
         else:
             fnames = glob.glob(self.root + '/' + self.date +
-                         '_drive_%04d_sync/velodyne_points/data/*.bin' % drive_id)
+                               '_drive_%04d_sync/velodyne_points/data/*.bin' % drive_id)
         assert len(fnames) > 0, f"Make sure that the path {self.root} has drive id: {drive_id}"
         inames = [int(os.path.split(fname)[-1][:-4]) for fname in fnames]
         return inames
@@ -313,19 +286,19 @@ class KITTIDataset(Dataset):
             if not os.path.exists(filename):
                 if self.IS_ODOMETRY:
                     M = (self.velo2cam @ positions[0].T @ np.linalg.inv(positions[1].T)
-                        @ np.linalg.inv(self.velo2cam)).T
+                         @ np.linalg.inv(self.velo2cam)).T
                 else:
                     M = self.get_position_transform(positions[0], positions[1], invert=True).T
                 xyz0_t = self.apply_transform(xyz0, M)
                 pcd0 = make_open3d_point_cloud(xyz0_t)
                 pcd1 = make_open3d_point_cloud(xyz1)
-                reg = o3d.registration.registration_icp(pcd0, pcd1, 0.2, np.eye(4),
-                                        o3d.registration.TransformationEstimationPointToPoint(),
-                                        o3d.registration.ICPConvergenceCriteria(max_iteration=200))
+                reg = open3d.registration.registration_icp(pcd0, pcd1, 0.2, np.eye(4),
+                                                           open3d.registration.TransformationEstimationPointToPoint(),
+                                                           open3d.registration.ICPConvergenceCriteria(max_iteration=200))
                 pcd0.transform(reg.transformation)
                 # pcd0.transform(M2) or self.apply_transform(xyz0, M2)
                 M2 = M @ reg.transformation
-                # o3d.draw_geometries([pcd0, pcd1])
+                # open3d.draw_geometries([pcd0, pcd1])
                 # write to a file
                 np.save(filename, M2)
             else:
@@ -334,15 +307,14 @@ class KITTIDataset(Dataset):
         else:
             M2 = kitti_icp_cache[key]
 
-        trans = M2 
+        trans = M2
 
         pcd0 = make_open3d_point_cloud(xyz0)
         pcd1 = make_open3d_point_cloud(xyz1)
-        pcd0 = o3d.voxel_down_sample(pcd0, self.voxel_size)
-        pcd1 = o3d.voxel_down_sample(pcd1, self.voxel_size)
+        pcd0 = open3d.voxel_down_sample(pcd0, self.voxel_size)
+        pcd1 = open3d.voxel_down_sample(pcd1, self.voxel_size)
         unaligned_anc_points = np.array(pcd0.points)
         unaligned_pos_points = np.array(pcd1.points)
-
 
         # Get matches
         # if True:
@@ -355,7 +327,7 @@ class KITTIDataset(Dataset):
                 return (None, None, None, None, None, None, False)
         else:
             matches = np.array([])
-        
+
         # align the two point cloud into one corredinate system.
         matches = np.array(matches)
         pcd0.transform(trans)
@@ -376,8 +348,8 @@ class KITTIDataset(Dataset):
             velo2cam = self._velo2cam
         except AttributeError:
             R = np.array([
-               7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
-               -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
+                7.533745e-03, -9.999714e-01, -6.166020e-04, 1.480249e-02, 7.280733e-04,
+                -9.998902e-01, 9.998621e-01, 7.523790e-03, 1.480755e-02
             ]).reshape(3, 3)
             T = np.array([-4.069766e-03, -7.631618e-02, -2.717806e-01]).reshape(3, 1)
             velo2cam = np.hstack([R, T])
@@ -398,7 +370,7 @@ class KITTIDataset(Dataset):
             odometry = []
             if indices is None:
                 fnames = glob.glob(self.root + '/' + self.date +
-                                '_drive_%04d_sync/velodyne_points/data/*.bin' % drive)
+                                   '_drive_%04d_sync/velodyne_points/data/*.bin' % drive)
                 indices = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
             for index in indices:
@@ -433,10 +405,10 @@ class KITTIDataset(Dataset):
             fname = self.root + '/sequences/%02d/velodyne/%06d.bin' % (drive, t)
         else:
             fname = self.root + \
-                '/' + self.date + '_drive_%04d_sync/velodyne_points/data/%010d.bin' % (
-                    drive, t)
+                    '/' + self.date + '_drive_%04d_sync/velodyne_points/data/%010d.bin' % (
+                        drive, t)
         return fname
-        
+
     def get_position_transform(self, pos0, pos1, invert=False):
         T0 = self.pos_transform(pos0)
         T1 = self.pos_transform(pos1)

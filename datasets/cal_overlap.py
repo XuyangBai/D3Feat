@@ -132,7 +132,7 @@ class ThreeDMatch(object):
 
 
 if __name__ == '__main__':
-    ThreeDMatch(root='/home/xybai/Point_Cloud_Descriptor/data/3DMatch/rgbd_fragments',
+    ThreeDMatch(root='path to your ply file.',
                 savepath='data/3DMatch',
                 split='train',
                 downsample=0.025

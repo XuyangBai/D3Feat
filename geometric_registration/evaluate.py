@@ -4,12 +4,13 @@ import numpy as np
 import time
 import os
 from geometric_registration.utils import get_pcd, get_keypts, get_desc, loadlog
-import cv2 
+import cv2
+
 
 def calculate_M(source_desc, target_desc):
     """
     Find the mutually closest point pairs in feature space.
-    source and target are descriptor for 2 point cloud key points. [5000, 512]
+    source and target are descriptor for 2 point cloud key points. [5000, 32]
     """
 
     new_sourceNNidx = []
@@ -34,7 +35,11 @@ def calculate_M(source_desc, target_desc):
     return np.array(result)
 
 
-def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logpath, gtLog, desc_name='ppf'):
+def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logpath, gtLog, desc_name):
+    """
+    Register point cloud {id1} and {id2} using the keypts location and descriptors.
+
+    """
     cloud_bin_s = f'cloud_bin_{id1}'
     cloud_bin_t = f'cloud_bin_{id2}'
     write_file = f'{cloud_bin_s}_{cloud_bin_t}.rt.txt'
@@ -43,18 +48,17 @@ def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logp
         return 0, 0, 0
     source_keypts = get_keypts(keyptspath, cloud_bin_s)
     target_keypts = get_keypts(keyptspath, cloud_bin_t)
-    # print(source_keypts.shape)
-    source_desc = get_desc(descpath, cloud_bin_s)
-    target_desc = get_desc(descpath, cloud_bin_t)
-    # print("Desc", source_desc.shape)
+    source_desc = get_desc(descpath, cloud_bin_s, desc_name)
+    target_desc = get_desc(descpath, cloud_bin_t, desc_name)
     source_desc = np.nan_to_num(source_desc)
     target_desc = np.nan_to_num(target_desc)
-    # only select num_keypts from all 5000 keypts 
+    # Select {num_keypts} points based on the scores. The descriptors and keypts are already sorted based on the detection score.
     num_keypts = 250
     source_keypts = source_keypts[-num_keypts:, :]
     source_desc = source_desc[-num_keypts:, :]
     target_keypts = target_keypts[-num_keypts:, :]
     target_desc = target_desc[-num_keypts:, :]
+    # Select {num_keypts} points randomly.
     # num_keypts = 250
     # source_indices = np.random.choice(range(source_keypts.shape[0]), num_keypts)
     # target_indices = np.random.choice(range(target_keypts.shape[0]), num_keypts)
@@ -70,17 +74,17 @@ def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logp
     else:
         # find mutually cloest point.
         corr = calculate_M(source_desc, target_desc)
-        
-        gtTrans = gtLog[key]
+
+        gt_trans = gtLog[key]
         frag1 = source_keypts[corr[:, 0]]
         frag2_pc = open3d.PointCloud()
         frag2_pc.points = open3d.utility.Vector3dVector(target_keypts[corr[:, 1]])
-        frag2_pc.transform(gtTrans)
+        frag2_pc.transform(gt_trans)
         frag2 = np.asarray(frag2_pc.points)
         distance = np.sqrt(np.sum(np.power(frag1 - frag2, 2), axis=1))
         num_inliers = np.sum(distance < 0.1)
         if num_inliers / len(distance) < 0.05:
-            print(key)      
+            print(key)
             print("num_corr:", len(corr), "inlier_ratio:", num_inliers / len(distance))
         inlier_ratio = num_inliers / len(distance)
         gt_flag = 1
@@ -100,9 +104,9 @@ def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logp
             open3d.TransformationEstimationPointToPoint(False), 3,
             [open3d.CorrespondenceCheckerBasedOnEdgeLength(0.9),
              open3d.CorrespondenceCheckerBasedOnDistance(0.05)],
-             open3d.RANSACConvergenceCriteria(50000, 1000))
+            open3d.RANSACConvergenceCriteria(50000, 1000))
 
-        with open(os.path.join(logpath, f'kpconv_{timestr}.log'), 'a+') as f:
+        with open(os.path.join(logpath, f'{desc_name}_{timestr}.log'), 'a+') as f:
             trans = result.transformation
             trans = np.linalg.inv(trans)
             s1 = f'{id1}\t {id2}\t  37\n'
@@ -111,6 +115,8 @@ def register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, logp
             f.write(f"{trans[1,0]}\t {trans[1,1]}\t {trans[1,2]}\t {trans[1,3]}\t \n")
             f.write(f"{trans[2,0]}\t {trans[2,1]}\t {trans[2,2]}\t {trans[2,3]}\t \n")
             f.write(f"{trans[3,0]}\t {trans[3,1]}\t {trans[3,2]}\t {trans[3,3]}\t \n")
+
+    # write the result into resultpath so that it can be re-show.
     s = f"{cloud_bin_s}\t{cloud_bin_t}\t{num_inliers}\t{inlier_ratio:.8f}\t{gt_flag}"
     with open(os.path.join(resultpath, f'{cloud_bin_s}_{cloud_bin_t}.rt.txt'), 'w+') as f:
         f.write(s)
@@ -143,7 +149,6 @@ def deal_with_one_scene(scene):
 
     # register each pair
     num_frag = len([filename for filename in os.listdir(pcdpath) if filename.endswith('ply')])
-    # num_frag = len(os.listdir(pcdpath))
     print(f"Start Evaluate Descriptor {desc_name} for {scene}")
     start_time = time.time()
     for id1 in range(num_frag):
@@ -154,18 +159,18 @@ def deal_with_one_scene(scene):
 
 if __name__ == '__main__':
     scene_list = [
-       '7-scenes-redkitchen',
-       'sun3d-home_at-home_at_scan1_2013_jan_1',
-       'sun3d-home_md-home_md_scan9_2012_sep_30',
-       'sun3d-hotel_uc-scan3',
-       'sun3d-hotel_umd-maryland_hotel1',
-       'sun3d-hotel_umd-maryland_hotel3',
-       'sun3d-mit_76_studyroom-76-1studyroom2',
-       'sun3d-mit_lab_hj-lab_hj_tea_nov_2_2012_scan1_erika'
+        '7-scenes-redkitchen',
+        'sun3d-home_at-home_at_scan1_2013_jan_1',
+        'sun3d-home_md-home_md_scan9_2012_sep_30',
+        'sun3d-hotel_uc-scan3',
+        'sun3d-hotel_umd-maryland_hotel1',
+        'sun3d-hotel_umd-maryland_hotel3',
+        'sun3d-mit_76_studyroom-76-1studyroom2',
+        'sun3d-mit_lab_hj-lab_hj_tea_nov_2_2012_scan1_erika'
     ]
-    # TODO: change it to my detector name.
-    desc_name = sys.argv[1]
-    timestr = sys.argv[2]
+    # will evaluate the descriptor in `{desc_name}_{timestr}` folder.
+    desc_name = 'JDKDD'
+    timestr = sys.argv[1]
     # inlier_ratio = float(sys.argv[3])
     # distance_threshold = float(sys.argv[4])
 
@@ -190,22 +195,21 @@ if __name__ == '__main__':
         resultpath = os.path.join(".", f"pred_result/{scene}/{desc_name}_result_{timestr}")
         num_frag = len([filename for filename in os.listdir(pcdpath) if filename.endswith('ply')])
         result = []
-        # result_rand = []
         for id1 in range(num_frag):
             for id2 in range(id1 + 1, num_frag):
                 line = read_register_result(resultpath, id1, id2)
-                result.append([int(line[0]), float(line[1]), int(line[2])])
+                result.append([int(line[0]), float(line[1]), int(line[2])])  # inlier_number, inlier_ratio, flag.
         result = np.array(result)
-        indices_results = np.sum(result[:, 2] == 1)
-        correct_match = np.sum(result[:, 1] > 0.05)
-        pred_match += correct_match
-        gt_match += indices_results
-        recall = float(correct_match / indices_results) * 100
-        print(f"Correct Match {correct_match}, ground truth Match {indices_results}")
+        gt_results = np.sum(result[:, 2] == 1)
+        pred_results = np.sum(result[:, 1] > 0.05)
+        pred_match += pred_results
+        gt_match += gt_results
+        recall = float(pred_results / gt_results) * 100
+        print(f"Correct Match {pred_results}, ground truth Match {gt_results}")
         print(f"Recall {recall}%")
-        ave_num_inliers = np.sum(np.where(result[:, 2] == 1, result[:, 0], np.zeros(result.shape[0]))) / correct_match
+        ave_num_inliers = np.sum(np.where(result[:, 2] == 1, result[:, 0], np.zeros(result.shape[0]))) / pred_results
         print(f"Average Num Inliners: {ave_num_inliers}")
-        ave_inlier_ratio = np.sum(np.where(result[:, 2] == 1, result[:, 1], np.zeros(result.shape[0]))) / correct_match
+        ave_inlier_ratio = np.sum(np.where(result[:, 2] == 1, result[:, 1], np.zeros(result.shape[0]))) / pred_results
         print(f"Average Num Inliner Ratio: {ave_inlier_ratio}")
         recall_list.append(recall)
         inliers_list.append(ave_num_inliers)

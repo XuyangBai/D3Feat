@@ -29,11 +29,11 @@ import time
 import tensorflow as tf
 import sys
 import numpy as np
-import shutil 
+import shutil
 import os
 
 # Convolution functions
-from models.D2Net import assemble_FCNN_blocks
+from models.JDKDD import assemble_FCNN_blocks
 from utils.loss import cdist, LOSS_CHOICES
 
 
@@ -62,21 +62,16 @@ class KernelPointFCNN:
                 # self.saving_path = time.strftime('results/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
                 self.saving_path = time.strftime('results/Log_%m%d%H%M')
                 if self.config.is_test:
-                    experiment_id = "KPConv" + time.strftime('%m%d%H%M') + "test"
+                    experiment_id = "JDKDD" + time.strftime('%m%d%H%M') + "test"
                 else:
-                    experiment_id = "KPConv" + time.strftime('%m%d%H%M')
+                    experiment_id = "JDKDD" + time.strftime('%m%d%H%M')
                 snapshot_root = 'snapshot/%s' % experiment_id
                 os.makedirs(snapshot_root, exist_ok=True)
                 tensorboard_root = 'tensorboard/%s' % experiment_id
                 os.makedirs(tensorboard_root, exist_ok=True)
-                shutil.copy2(os.path.join('.', 'models/network_blocks.py'), os.path.join(snapshot_root, 'network_blocks.py'))
-                shutil.copy2(os.path.join('.', 'kernels/convolution_ops.py'), os.path.join(snapshot_root, 'conv_ops.py'))
                 shutil.copy2(os.path.join('.', 'training_3DMatch.py'), os.path.join(snapshot_root, 'train.py'))
                 shutil.copy2(os.path.join('.', 'utils/trainer.py'), os.path.join(snapshot_root, 'trainer.py'))
-                shutil.copy2(os.path.join('.', 'models/D2Net.py'), os.path.join(snapshot_root, 'model.py'))
-                shutil.copy2(os.path.join('.', 'models/KPFCNN_model.py'), os.path.join(snapshot_root, 'model_true.py'))
-                shutil.copy2(os.path.join('.', 'datasets/ThreeDMatch.py'), os.path.join(snapshot_root, 'dataset.py'))
-                shutil.copy2(os.path.join('.', 'loss.py'), os.path.join(snapshot_root, 'loss.py'))
+                shutil.copy2(os.path.join('.', 'models/JDKDD.py'), os.path.join(snapshot_root, 'model.py'))
                 self.tensorboard_root = tensorboard_root
             else:
                 self.saving_path = self.config.saving_path
@@ -113,7 +108,7 @@ class KernelPointFCNN:
             self.anchor_keypts_inds = tf.squeeze(flat_inputs[ind])
             ind += 1
             self.positive_keypts_inds = tf.squeeze(flat_inputs[ind])
-            ind += 1 
+            ind += 1
             self.anc_id = flat_inputs[ind][0]
             self.pos_id = flat_inputs[ind][1]
             ind += 1
@@ -131,11 +126,11 @@ class KernelPointFCNN:
         # Create layers
         # with tf.device('/gpu:%d' % config.gpu_id):
         with tf.variable_scope('KernelPointNetwork', reuse=False) as scope:
-            self.out_features, self.out_scores  = assemble_FCNN_blocks(self.anchor_inputs, self.config, self.dropout_prob)
+            self.out_features, self.out_scores = assemble_FCNN_blocks(self.anchor_inputs, self.config, self.dropout_prob)
             anc_keypts = tf.gather(self.anchor_inputs['backup_points'], self.anchor_keypts_inds)
             self.keypts_distance = cdist(anc_keypts, anc_keypts, metric='euclidean')
             # self.anchor_keypts_inds, self.positive_keypts_inds, self.keypts_distance = self.anc_key, self.pos_key, self.keypts_distance
-        
+
         # show all the trainable vairble
         all_trainable_vars = tf.trainable_variables()
         for i in range(len(all_trainable_vars)):
@@ -158,37 +153,41 @@ class KernelPointFCNN:
             mask = tf.logical_and(false_negative_mask, tf.logical_not(same_identity_mask))
             self.dists += tf.scalar_mul(10, tf.cast(mask, tf.float32))
             # calculate the contrastive loss using the dist
-            self.batchhard_loss, self.accuracy, self.average_dist = LOSS_CHOICES['batch_hard'](self.dists, positiveIDS)
+            self.desc_loss, self.accuracy, self.average_dist = LOSS_CHOICES['batch_hard'](self.dists, positiveIDS)
             # calculate the score loss.
-            if config.repeat_loss_weight != 0:
+            if config.det_loss_weight != 0:
                 self.anchor_scores = tf.gather(self.out_scores, self.anchor_keypts_inds)
                 self.positve_scores = tf.gather(self.out_scores, self.positive_keypts_inds)
-                self.repeat_loss = LOSS_CHOICES['repeat_loss'](self.dists, self.anchor_scores, self.positve_scores, positiveIDS, margin=1)
-                self.repeat_loss = tf.scalar_mul(self.config.repeat_loss_weight, self.repeat_loss)
+                self.det_loss = LOSS_CHOICES['det_loss'](self.dists, self.anchor_scores, self.positve_scores, positiveIDS, margin=1)
+                self.det_loss = tf.scalar_mul(self.config.det_loss_weight, self.det_loss)
             else:
-                self.repeat_loss = tf.constant(0, dtype=self.batchhard_loss.dtype)
+                self.det_loss = tf.constant(0, dtype=self.desc_loss.dtype)
 
             # if the number of correspondence is less than half of keypts num, then skip
             enough_keypts_num = tf.constant(0.5 * config.keypts_num)
             condition = tf.less_equal(enough_keypts_num, tf.cast(tf.size(self.anchor_keypts_inds), tf.float32))
-            def true_fn(): 
-                return self.batchhard_loss, self.repeat_loss, self.accuracy, self.average_dist
-            def false_fn(): 
-                return tf.constant(0, dtype=self.batchhard_loss.dtype), tf.constant(0, dtype=self.repeat_loss.dtype), tf.constant(-1, dtype=self.accuracy.dtype), tf.constant(0, dtype=self.average_dist.dtype)
-            self.batchhard_loss, self.repeat_loss, self.accuracy, self.average_dist = tf.cond(condition, true_fn, false_fn)
+
+            def true_fn():
+                return self.desc_loss, self.det_loss, self.accuracy, self.average_dist
+
+            def false_fn():
+                return tf.constant(0, dtype=self.desc_loss.dtype), tf.constant(0, dtype=self.det_loss.dtype), tf.constant(-1,
+                                                                                                                          dtype=self.accuracy.dtype), tf.constant(
+                    0, dtype=self.average_dist.dtype)
+
+            self.desc_loss, self.det_loss, self.accuracy, self.average_dist = tf.cond(condition, true_fn, false_fn)
             # Get L2 norm of all weights
             regularization_losses = [tf.nn.l2_loss(v) for v in tf.global_variables() if 'weights' in v.name]
             self.regularization_loss = self.config.weights_decay * tf.add_n(regularization_losses)
-            self.loss = self.batchhard_loss + self.repeat_loss + self.regularization_loss
-        tf.summary.scalar('batch hard loss', self.batchhard_loss)
+            self.loss = self.desc_loss + self.det_loss + self.regularization_loss
+        tf.summary.scalar('desc loss', self.desc_loss)
         tf.summary.scalar('accuracy', self.accuracy)
-        tf.summary.scalar('repeat loss', self.repeat_loss)
+        tf.summary.scalar('det loss', self.det_loss)
         tf.summary.scalar('average dist', self.average_dist)
         self.merged = tf.summary.merge_all()
         if self.tensorboard_root != '':
             self.train_writer = tf.summary.FileWriter(self.tensorboard_root + '/train/')
             self.val_writer = tf.summary.FileWriter(self.tensorboard_root + '/val/')
-
 
         return
 

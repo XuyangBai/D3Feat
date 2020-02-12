@@ -216,7 +216,7 @@ class ModelTrainer:
         if model.config.saving:
             # Training log file
             with open(join(model.saving_path, 'training.txt'), "w") as file:
-                file.write('Steps batchhard_loss reg_loss l2_loss train_accuracy time memory\n')
+                file.write('Steps desc_loss det_loss train_accuracy ave_dist time memory\n')
 
             # Killing file (simply delete this file when you want to stop the training)
             if not exists(join(model.saving_path, 'running_PID.txt')):
@@ -238,8 +238,8 @@ class ModelTrainer:
         self.sess.run(dataset.train_init_op)
 
         ave_dist_buf = []
-        batchhard_loss_buf = []
-        repeat_loss_buf = []
+        desc_loss_buf = []
+        det_loss_buf = []
         accuracy_buf = []
         # Start loop
         while self.training_epoch < model.config.max_epoch:
@@ -250,9 +250,9 @@ class ModelTrainer:
                 ops = [self.train_op,
                        model.merged,
                        model.batchhard_loss,
-                       model.repeat_loss,
-                    #    model.regularization_loss,
-                    #    model.l2_loss,
+                       model.det_loss,
+                       #    model.regularization_loss,
+                       #    model.l2_loss,
                        model.accuracy,
                        model.dists,
                        model.average_dist,
@@ -266,47 +266,43 @@ class ModelTrainer:
                 # If NaN appears in a training, use this debug block
                 if debug_NaN:
                     all_values = self.sess.run(ops + [self.check_op] + list(dataset.flat_inputs), {model.dropout_prob: 0.5})
-                    _, L_bh, L_rep, acc, dists = all_values[1:6]
-                    if np.isnan(L_rep) or np.isnan(L_bh):
+                    _, L_desc, L_det, acc, dists = all_values[1:6]
+                    if np.isnan(L_det) or np.isnan(L_desc):
                         input_values = all_values[7:]
                         self.debug_nan(model, input_values, probs)
                         a = 1 / 0
 
                 else:
                     # Run normal
-                    _, merged, L_bh, L_rep, acc, dists, ave_dist, inputs, scores, features, anc_key, pos_key = self.sess.run(ops, {model.dropout_prob: 0.5})
-                    # points, pos_key, anc_key = self.sess.run([model.anchor_inputs['points'][0], model.positive_keypts_inds, model.anchor_keypts_inds])
+                    _, merged, L_desc, L_det, acc, dists, ave_dist, inputs, scores, features, anc_key, pos_key = self.sess.run(ops, {
+                        model.dropout_prob: 0.5})
                     if self.training_step % 1000 == 0:
                         print("Anchor Score:", scores[anc_key].squeeze())
                         print("Positive Score:", scores[pos_key].squeeze())
-                    if L_bh != 0:
-                        batchhard_loss_buf.append(L_bh)
+                    if L_desc != 0:
+                        desc_loss_buf.append(L_desc)
                     if acc > 0:
                         accuracy_buf.append(acc)
-                    if L_rep != 0:
-                        repeat_loss_buf.append(L_rep)
+                    if L_det != 0:
+                        det_loss_buf.append(L_det)
                     if ave_dist != 0:
                         ave_dist_buf.append(ave_dist)
 
                 t += [time.time()]
 
-                # Stack prediction for training confusion
-                # if model.config.network_model == 'classification':
-                #     self.training_preds = np.hstack((self.training_preds, np.argmax(probs, axis=1)))
-                #     self.training_labels = np.hstack((self.training_labels, labels))
                 t += [time.time()]
 
                 # Average timing
                 mean_dt = 0.95 * mean_dt + 0.05 * (np.array(t[1:]) - np.array(t[:-1]))
-                
+
                 # Console display (only one per second)
                 if (t[-1] - last_display) > 1.0:
                     last_display = t[-1]
-                    message = 'Step {:08d} L_out={:5.3f} L_rep={:5.3f} Acc={:4.2f} Mean Dist:{:4.3f} ' \
+                    message = 'Step {:08d} L_out={:5.3f} L_det={:5.3f} Acc={:4.2f} Mean Dist:{:4.3f} ' \
                               '---{:8.2f} ms/batch (Averaged)'
                     print(message.format(self.training_step,
-                                         L_bh,
-                                         L_rep,
+                                         L_desc,
+                                         L_det,
                                          acc,
                                          ave_dist,
                                          1000 * mean_dt[0],
@@ -318,8 +314,8 @@ class ModelTrainer:
                     with open(join(model.saving_path, 'training.txt'), "a") as file:
                         message = '{:d} {:.3f} {:.3f} {:.2f} {:.2f} {:.3f} {:.1f}\n'
                         file.write(message.format(self.training_step,
-                                                  L_bh,
-                                                  L_rep,
+                                                  L_desc,
+                                                  L_det,
                                                   acc,
                                                   ave_dist,
                                                   t[-1] - t0,
@@ -334,19 +330,19 @@ class ModelTrainer:
 
             except tf.errors.OutOfRangeError:
                 # Tensorboard
-                mean_repeat_loss = np.mean(repeat_loss_buf)
-                mean_batchhard_loss = np.mean(batchhard_loss_buf)
+                mean_det_loss = np.mean(det_loss_buf)
+                mean_desc_loss = np.mean(desc_loss_buf)
                 mean_accuracy = np.mean(accuracy_buf)
                 mean_dist = np.mean(ave_dist_buf)
                 summary = tf.Summary()
-                summary.value.add(tag="batch_hard_loss", simple_value=mean_batchhard_loss)
-                summary.value.add(tag="repeat_loss", simple_value=mean_repeat_loss)
+                summary.value.add(tag="desc_loss", simple_value=mean_desc_loss)
+                summary.value.add(tag="det_loss", simple_value=mean_det_loss)
                 summary.value.add(tag="accuracy", simple_value=mean_accuracy)
                 summary.value.add(tag="mean_dist", simple_value=mean_dist)
                 model.train_writer.add_summary(summary, self.training_epoch + 1)
-                batchhard_loss_buf = []
+                desc_loss_buf = []
                 accuracy_buf = []
-                repeat_loss_buf = []
+                det_loss_buf = []
                 ave_dist_buf = []
 
                 # End of train dataset, update average of epoch steps
@@ -359,7 +355,7 @@ class ModelTrainer:
 
                 # Snapshot
                 if model.config.saving and (self.training_epoch + 1) % model.config.snapshot_gap == 0:
-                    
+
                     # Tensorflow snapshot
                     snapshot_directory = join(model.saving_path, 'snapshots')
                     if not exists(snapshot_directory):
@@ -385,7 +381,7 @@ class ModelTrainer:
                 self.sess.run(dataset.train_init_op)
 
             except tf.errors.InvalidArgumentError as e:
-                
+
                 import pdb
                 pdb.set_trace()
                 print('Caught a NaN error :')
@@ -412,8 +408,8 @@ class ModelTrainer:
     def validation(self, model, dataset):
         self.sess.run(dataset.val_init_op)
 
-        batchhard_loss_buf = []
-        repeat_loss_buf = []
+        desc_loss_buf = []
+        det_loss_buf = []
         accuracy_buf = []
         ave_dist_buf = []
         mean_dt = np.zeros(2)
@@ -422,24 +418,24 @@ class ModelTrainer:
             try:
                 # Run one step of the model.
                 t = [time.time()]
-                ops = (model.batchhard_loss, 
-                        model.repeat_loss, 
-                        model.accuracy,
-                        model.average_dist,
-                        model.dists,
-                        model.out_scores,
-                        model.anchor_keypts_inds,
-                        model.positive_keypts_inds
-                        )
-                batchhard_loss, repeat_loss, accuracy, ave_dist, dists, scores, anc_key, pos_key = self.sess.run(ops, {model.dropout_prob: 1.0})
+                ops = (model.desc_loss,
+                       model.det_loss,
+                       model.accuracy,
+                       model.average_dist,
+                       model.dists,
+                       model.out_scores,
+                       model.anchor_keypts_inds,
+                       model.positive_keypts_inds
+                       )
+                desc_loss, det_loss, accuracy, ave_dist, dists, scores, anc_key, pos_key = self.sess.run(ops, {model.dropout_prob: 1.0})
                 # print("Anchor Score:", scores[anc_key].squeeze())
                 # print("Positive Score:", scores[pos_key].squeeze())
                 print(dists.shape)
-                if batchhard_loss != 0:
-                    batchhard_loss_buf.append(batchhard_loss)
+                if desc_loss != 0:
+                    desc_loss_buf.append(desc_loss)
                 t += [time.time()]
-                if repeat_loss != 0:
-                    repeat_loss_buf.append(repeat_loss)
+                if det_loss != 0:
+                    det_loss_buf.append(det_loss)
                 if accuracy > 0:
                     accuracy_buf.append(accuracy)
                 if ave_dist != 0:
@@ -458,29 +454,33 @@ class ModelTrainer:
                 break
 
         # Print instance mean
-        mean_batchhard_loss = np.mean(batchhard_loss_buf)
-        mean_repeat_loss = np.mean(repeat_loss_buf)
+        mean_desc_loss = np.mean(desc_loss_buf)
+        mean_det_loss = np.mean(det_loss_buf)
         mean_accuracy = np.mean(accuracy_buf)
         mean_dist = np.mean(ave_dist_buf)
         summary = tf.Summary()
-        summary.value.add(tag="batch_hard_loss", simple_value=mean_batchhard_loss)
-        summary.value.add(tag="repeat_loss", simple_value=mean_repeat_loss)
+        summary.value.add(tag="desc_loss", simple_value=mean_desc_loss)
+        summary.value.add(tag="det_loss", simple_value=mean_det_loss)
         summary.value.add(tag="accuracy", simple_value=mean_accuracy)
         summary.value.add(tag="mean_dist", simple_value=mean_dist)
         model.val_writer.add_summary(summary, self.training_epoch)
-        print('{:s} Epoch {:3d}: batchhard_loss = {:.3f} rep_loss = {:.3f} accuracy = {:.2f}%  mean_dist = {:.3f}'.format(model.config.dataset, self.training_epoch, mean_batchhard_loss, mean_repeat_loss,
-                                                                                            mean_accuracy * 100, mean_dist))
+        print('{:s} Epoch {:3d}: desc_loss = {:.3f} det_loss = {:.3f} accuracy = {:.2f}%  mean_dist = {:.3f}'.format(model.config.dataset,
+                                                                                                                     self.training_epoch,
+                                                                                                                     mean_desc_loss,
+                                                                                                                     mean_det_loss,
+                                                                                                                     mean_accuracy * 100,
+                                                                                                                     mean_dist))
         if model.config.saving:
             process = psutil.Process(os.getpid())
             with open(join(model.saving_path, 'training.txt'), "a") as file:
-                message = '{:s} Epoch {:3d}: batchhard_loss = {:.3f} rep_loss = {:.3f} accuracy = {:.2f}% mean_dist = {:.3f}\n'
+                message = '{:s} Epoch {:3d}: desc_loss = {:.3f} det_loss = {:.3f} accuracy = {:.2f}% mean_dist = {:.3f}\n'
                 file.write(message.format(model.config.dataset,
-                    self.training_epoch,
-                    mean_batchhard_loss,
-                    mean_repeat_loss, 
-                    mean_accuracy * 100,
-                    mean_dist)
-                )
+                                          self.training_epoch,
+                                          mean_desc_loss,
+                                          mean_det_loss,
+                                          mean_accuracy * 100,
+                                          mean_dist)
+                           )
         return
 
     # Saving methods

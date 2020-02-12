@@ -12,8 +12,8 @@ def get_keypts(keyptspath, filename):
     return keypts
 
 
-def get_desc(descpath, filename):
-    desc = np.load(os.path.join(descpath, filename + f'.desc.kpconv.bin.npy'))
+def get_desc(descpath, filename, desc_name):
+    desc = np.load(os.path.join(descpath, filename + f'.{desc_name}.npy'))
     return desc
 
 
