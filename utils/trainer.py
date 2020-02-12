@@ -249,7 +249,7 @@ class ModelTrainer:
                 t = [time.time()]
                 ops = [self.train_op,
                        model.merged,
-                       model.batchhard_loss,
+                       model.desc_loss,
                        model.det_loss,
                        #    model.regularization_loss,
                        #    model.l2_loss,
@@ -428,9 +428,6 @@ class ModelTrainer:
                        model.positive_keypts_inds
                        )
                 desc_loss, det_loss, accuracy, ave_dist, dists, scores, anc_key, pos_key = self.sess.run(ops, {model.dropout_prob: 1.0})
-                # print("Anchor Score:", scores[anc_key].squeeze())
-                # print("Positive Score:", scores[pos_key].squeeze())
-                print(dists.shape)
                 if desc_loss != 0:
                     desc_loss_buf.append(desc_loss)
                 t += [time.time()]

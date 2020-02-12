@@ -105,12 +105,11 @@ def assemble_FCNN_blocks(inputs, config, dropout_prob):
     # use the max score among channel to be the score of a single point. 
     score = tf.reduce_max(all_score, axis=1, keepdims=True)  # [n_points, 1]
 
-    # hard selection
-    if not training:
-        local_max = tf.reduce_max(neighbor_features, axis=1)
-        is_local_max = tf.equal(features, local_max)
-        is_local_max = tf.Print(is_local_max, [tf.reduce_sum(tf.cast(is_local_max, tf.int32))], message='num of local max')
-        detected = tf.reduce_max(tf.cast(is_local_max, tf.float32), axis=1, keepdims=True)
-        score = score * detected
+    # hard selection (used during test)
+    local_max = tf.reduce_max(neighbor_features, axis=1)
+    is_local_max = tf.equal(features, local_max)
+    is_local_max = tf.Print(is_local_max, [tf.reduce_sum(tf.cast(is_local_max, tf.int32))], message='num of local max')
+    detected = tf.reduce_max(tf.cast(is_local_max, tf.float32), axis=1, keepdims=True)
+    score = score * detected
 
     return backup_features, score[:-1, :]

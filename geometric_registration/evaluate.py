@@ -169,8 +169,8 @@ if __name__ == '__main__':
         'sun3d-mit_lab_hj-lab_hj_tea_nov_2_2012_scan1_erika'
     ]
     # will evaluate the descriptor in `{desc_name}_{timestr}` folder.
-    desc_name = 'JDKDD'
-    timestr = sys.argv[1]
+    desc_name = sys.argv[1]
+    timestr = sys.argv[2]
     # inlier_ratio = float(sys.argv[3])
     # distance_threshold = float(sys.argv[4])
 

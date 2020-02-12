@@ -51,7 +51,7 @@ def get_matching_indices(source, target, trans, search_voxel_size, K=None):
 class KITTIDataset(Dataset):
     AUGMENT = None
     DATA_FILES = {
-        'train': 'data/kitti/config/train_kitti.txt',
+        'train': '/home/xybai/FCGF/config/train_kitti.txt',
         'val': 'data/kitti/config/val_kitti.txt',
         'test': 'data/kitti/config/test_kitti.txt'
     }
@@ -85,7 +85,7 @@ class KITTIDataset(Dataset):
         for dirname in subset_names:
             drive_id = int(dirname)
             fnames = glob.glob(self.root + '/sequences/%02d/velodyne/*.bin' % drive_id)
-            assert len(fnames) > 0, f"Make sure that the path {root} has data {dirname}"
+            assert len(fnames) > 0, f"Make sure that the path {self.root} has data {dirname}"
             inames = sorted([int(os.path.split(fname)[-1][:-4]) for fname in fnames])
 
             all_odo = self.get_video_odometry(drive_id, return_all=True)

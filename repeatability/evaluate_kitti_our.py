@@ -23,7 +23,7 @@ def calculate_repeatability(num_keypts):
     from datasets.KITTI import KITTIDataset
     dataset = KITTIDataset(1, first_subsampling_dl=0.3, load_test=True)
     repeat_list = []
-    keyptspath = f"geometric_registration_kitti/{timestr}"
+    keyptspath = f"geometric_registration_kitti/{desc_name}_{timestr}"
     for i in range(len(dataset.files['test'])):
         drive = dataset.files['test'][i][0]
         t0, t1 = dataset.files['test'][i][1], dataset.files['test'][i][2]

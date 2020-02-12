@@ -339,7 +339,7 @@ class ThreeDMatchDataset(Dataset):
         ]
         self.num_test = 0
         for scene in scene_list:
-            self.test_path = 'data/3DMatch/fragments/{}'.format(scene)
+            self.test_path = f'{self.root}/fragments/{scene}'
             pcd_list = [filename for filename in os.listdir(self.test_path) if filename.endswith('ply')]
             self.num_test += len(pcd_list)
 

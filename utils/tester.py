@@ -238,10 +238,10 @@ class ModelTester:
         use_random_points = False
         if use_random_points:
             num_keypts = 5000
-            icp_save_path = f'geometric_registration_kitti/{self.experiment_str}-rand{num_keypts}'
+            icp_save_path = f'geometric_registration_kitti/JDKDD_{self.experiment_str}-rand{num_keypts}'
         else:
             num_keypts = 250
-            icp_save_path = f'geometric_registration_kitti/{self.experiment_str}-pred{num_keypts}'
+            icp_save_path = f'geometric_registration_kitti/JDKDD_{self.experiment_str}-pred{num_keypts}'
         if not exists(icp_save_path):
             makedirs(icp_save_path)
 
