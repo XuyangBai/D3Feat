@@ -139,7 +139,7 @@ if __name__ == '__main__':
         'wood_summer',
     ]
     # will evaluate the descriptor in `{desc_name}_{timestr}` folder.
-    desc_name = 'JDKDD'
+    desc_name = 'D3Feat'
     timestr = sys.argv[1]
 
     # multiprocessing to register each pair in each scene.

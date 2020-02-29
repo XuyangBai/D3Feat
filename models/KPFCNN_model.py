@@ -33,7 +33,7 @@ import shutil
 import os
 
 # Convolution functions
-from models.JDKDD import assemble_FCNN_blocks
+from models.D3Feat import assemble_FCNN_blocks
 from utils.loss import cdist, LOSS_CHOICES
 
 
@@ -62,16 +62,16 @@ class KernelPointFCNN:
                 # self.saving_path = time.strftime('results/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
                 self.saving_path = time.strftime('results/Log_%m%d%H%M')
                 if self.config.is_test:
-                    experiment_id = "JDKDD" + time.strftime('%m%d%H%M') + "test"
+                    experiment_id = "D3Feat" + time.strftime('%m%d%H%M') + "test"
                 else:
-                    experiment_id = "JDKDD" + time.strftime('%m%d%H%M')
+                    experiment_id = "D3Feat" + time.strftime('%m%d%H%M')
                 snapshot_root = 'snapshot/%s' % experiment_id
                 os.makedirs(snapshot_root, exist_ok=True)
                 tensorboard_root = 'tensorboard/%s' % experiment_id
                 os.makedirs(tensorboard_root, exist_ok=True)
-                shutil.copy2(os.path.join('.', 'training_3DMatch.py'), os.path.join(snapshot_root, 'train.py'))
-                shutil.copy2(os.path.join('.', 'utils/trainer.py'), os.path.join(snapshot_root, 'trainer.py'))
-                shutil.copy2(os.path.join('.', 'models/JDKDD.py'), os.path.join(snapshot_root, 'model.py'))
+                # shutil.copy2(os.path.join('.', 'training_3DMatch.py'), os.path.join(snapshot_root, 'train.py'))
+                # shutil.copy2(os.path.join('.', 'utils/trainer.py'), os.path.join(snapshot_root, 'trainer.py'))
+                # shutil.copy2(os.path.join('.', 'models/D3Feat.py'), os.path.join(snapshot_root, 'model.py'))
                 self.tensorboard_root = tensorboard_root
             else:
                 self.saving_path = self.config.saving_path

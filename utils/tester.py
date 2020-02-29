@@ -182,9 +182,9 @@ class ModelTester:
             self.experiment_str = self.experiment_str + '-rand'
         else:
             self.experiment_str = self.experiment_str + '-pred'
-        descriptor_path = f'geometric_registration/JDKDD_{self.experiment_str}/descriptors'
-        keypoint_path = f'geometric_registration/JDKDD_{self.experiment_str}/keypoints'
-        score_path = f'geometric_registration/JDKDD_{self.experiment_str}/scores'
+        descriptor_path = f'geometric_registration/D3Feat_{self.experiment_str}/descriptors'
+        keypoint_path = f'geometric_registration/D3Feat_{self.experiment_str}/keypoints'
+        score_path = f'geometric_registration/D3Feat_{self.experiment_str}/scores'
         if not exists(descriptor_path):
             makedirs(descriptor_path)
         if not exists(keypoint_path):
@@ -224,7 +224,7 @@ class ModelTester:
             if not exists(score_path_scene):
                 os.mkdir(score_path_scene)
 
-            np.save(join(descriptor_path_scene, 'cloud_bin_{}.JDKDD'.format(num_frag)), anc_features.astype(np.float32))
+            np.save(join(descriptor_path_scene, 'cloud_bin_{}.D3Feat'.format(num_frag)), anc_features.astype(np.float32))
             np.save(join(keypoint_path_scene, 'cloud_bin_{}'.format(num_frag)), keypts_loc.astype(np.float32))
             np.save(join(score_path_scene, 'cloud_bin_{}'.format(num_frag)), keypts_score.astype(np.float32))
             print("Generate cloud_bin_{0} for {1}".format(num_frag, scene))
@@ -238,10 +238,10 @@ class ModelTester:
         use_random_points = False
         if use_random_points:
             num_keypts = 5000
-            icp_save_path = f'geometric_registration_kitti/JDKDD_{self.experiment_str}-rand{num_keypts}'
+            icp_save_path = f'geometric_registration_kitti/D3Feat_{self.experiment_str}-rand{num_keypts}'
         else:
             num_keypts = 250
-            icp_save_path = f'geometric_registration_kitti/JDKDD_{self.experiment_str}-pred{num_keypts}'
+            icp_save_path = f'geometric_registration_kitti/D3Feat_{self.experiment_str}-pred{num_keypts}'
         if not exists(icp_save_path):
             makedirs(icp_save_path)
 

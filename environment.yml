@@ -1,4 +1,4 @@
-name: kpconv
+name: D3Feat
 channels:
   - open3d-admin
   - anaconda
@@ -179,5 +179,5 @@ dependencies:
     - pyqt5-sip==4.19.18
     - pyqtwebengine==5.12.1
     - scs==2.1.1-2
-prefix: /home/xybai/anaconda3/envs/kpconv
+prefix: /home/xybai/anaconda3/envs/D3Feat
 
