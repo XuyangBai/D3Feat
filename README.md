@@ -1,6 +1,6 @@
 # D3Feat repository
 
-TensorFlow implementation of D3Feat for CVPR'2020 paper ["D3Feat: Joint Learning of Dense Detection and Description of 3D Local Features"](https://arxiv.org/abs/2003.03164), by Xuyang Bai, Zixin Luo, Lei Zhou, Hongbo Fu, Long Quan and Chiew-Lan Tai.
+TensorFlow implementation of D3Feat for CVPR'2020 Oral paper ["D3Feat: Joint Learning of Dense Detection and Description of 3D Local Features"](https://arxiv.org/abs/2003.03164), by Xuyang Bai, Zixin Luo, Lei Zhou, Hongbo Fu, Long Quan and Chiew-Lan Tai.
 
 This paper focus on dense feature detection and description for 3D point clouds in a joint manner. If you find this project useful, please cite:
 
