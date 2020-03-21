@@ -9,6 +9,9 @@ open3d.set_verbosity_level(open3d.VerbosityLevel.Error)
 
 
 def deal_with_one_pair(source_keypts, target_keypts, trans, num_keypts, threshold):
+    """
+    calculate the relative repeatability under {num_keypts} settings for one pair.
+    """
     gtTrans = trans
     pcd = open3d.PointCloud()
     pcd.points = open3d.utility.Vector3dVector(source_keypts)
@@ -19,7 +22,10 @@ def deal_with_one_pair(source_keypts, target_keypts, trans, num_keypts, threshol
     return num_repeat * 1.0 / num_keypts
 
 
-def calculate_repeatability(num_keypts):
+def calculate_repeatability(desc_name, timestr, num_keypts):
+    """
+    calculate the relative repeatability of {desc_name}_{timestr} under {num_keypts} setting.
+    """
     from datasets.KITTI import KITTIDataset
     dataset = KITTIDataset(1, first_subsampling_dl=0.3, load_test=True)
     repeat_list = []
@@ -52,5 +58,5 @@ if __name__ == '__main__':
     # pool.join()
 
     for i in num_list:
-        ave_repeatability = calculate_repeatability(i)
+        ave_repeatability = calculate_repeatability(desc_name, timestr, i)
         rep_list.append(ave_repeatability)

@@ -105,9 +105,9 @@ class KernelPointFCNN:
             # ind += 1
             self.anchor_inputs['stack_lengths'] = flat_inputs[ind]
             ind += 1
-            self.anchor_keypts_inds = tf.squeeze(flat_inputs[ind])
+            self.anc_keypts_inds = tf.squeeze(flat_inputs[ind])
             ind += 1
-            self.positive_keypts_inds = tf.squeeze(flat_inputs[ind])
+            self.pos_keypts_inds = tf.squeeze(flat_inputs[ind])
             ind += 1
             self.anc_id = flat_inputs[ind][0]
             self.pos_id = flat_inputs[ind][1]
@@ -127,7 +127,7 @@ class KernelPointFCNN:
         # with tf.device('/gpu:%d' % config.gpu_id):
         with tf.variable_scope('KernelPointNetwork', reuse=False) as scope:
             self.out_features, self.out_scores = assemble_FCNN_blocks(self.anchor_inputs, self.config, self.dropout_prob)
-            anc_keypts = tf.gather(self.anchor_inputs['backup_points'], self.anchor_keypts_inds)
+            anc_keypts = tf.gather(self.anchor_inputs['backup_points'], self.anc_keypts_inds)
             self.keypts_distance = cdist(anc_keypts, anc_keypts, metric='euclidean')
             # self.anchor_keypts_inds, self.positive_keypts_inds, self.keypts_distance = self.anc_key, self.pos_key, self.keypts_distance
 
@@ -141,45 +141,50 @@ class KernelPointFCNN:
 
         with tf.variable_scope('loss'):
             # calculate the distance between anchor and positive in feature space.
-            positiveIDS = tf.range(tf.size(self.anchor_keypts_inds))
-            positiveIDS = tf.reshape(positiveIDS, [tf.size(self.anchor_keypts_inds)])
-            self.anchor_keypoints_feat = tf.gather(self.out_features, self.anchor_keypts_inds)
-            self.positive_keypoints_feat = tf.gather(self.out_features, self.positive_keypts_inds)
-            dists = cdist(self.anchor_keypoints_feat, self.positive_keypoints_feat, metric='euclidean')
+            positiveIDS = tf.range(tf.size(self.anc_keypts_inds))
+            positiveIDS = tf.reshape(positiveIDS, [tf.size(self.anc_keypts_inds)])
+            self.anc_features = tf.gather(self.out_features, self.anc_keypts_inds)
+            self.pos_features = tf.gather(self.out_features, self.pos_keypts_inds)
+            dists = cdist(self.anc_features, self.pos_features, metric='euclidean')
             self.dists = dists
-            # add 10 to the false negative pairs. 
+            # add 10 to the false negative pairs (within the safe radius).
             same_identity_mask = tf.equal(tf.expand_dims(positiveIDS, axis=1), tf.expand_dims(positiveIDS, axis=0))
             false_negative_mask = tf.less(self.keypts_distance, config.safe_radius)
             mask = tf.logical_and(false_negative_mask, tf.logical_not(same_identity_mask))
             self.dists += tf.scalar_mul(10, tf.cast(mask, tf.float32))
+
             # calculate the contrastive loss using the dist
             self.desc_loss, self.accuracy, self.average_dist = LOSS_CHOICES['desc_loss'](self.dists, positiveIDS)
+
             # calculate the score loss.
             if config.det_loss_weight != 0:
-                self.anchor_scores = tf.gather(self.out_scores, self.anchor_keypts_inds)
-                self.positve_scores = tf.gather(self.out_scores, self.positive_keypts_inds)
-                self.det_loss = LOSS_CHOICES['det_loss'](self.dists, self.anchor_scores, self.positve_scores, positiveIDS)
+                self.anc_scores = tf.gather(self.out_scores, self.anc_keypts_inds)
+                self.pos_scores = tf.gather(self.out_scores, self.pos_keypts_inds)
+                self.det_loss = LOSS_CHOICES['det_loss'](self.dists, self.anc_scores, self.pos_scores, positiveIDS)
                 self.det_loss = tf.scalar_mul(self.config.det_loss_weight, self.det_loss)
             else:
                 self.det_loss = tf.constant(0, dtype=self.desc_loss.dtype)
 
             # if the number of correspondence is less than half of keypts num, then skip
             enough_keypts_num = tf.constant(0.5 * config.keypts_num)
-            condition = tf.less_equal(enough_keypts_num, tf.cast(tf.size(self.anchor_keypts_inds), tf.float32))
+            condition = tf.less_equal(enough_keypts_num, tf.cast(tf.size(self.anc_keypts_inds), tf.float32))
 
             def true_fn():
                 return self.desc_loss, self.det_loss, self.accuracy, self.average_dist
 
             def false_fn():
-                return tf.constant(0, dtype=self.desc_loss.dtype), tf.constant(0, dtype=self.det_loss.dtype), tf.constant(-1,
-                                                                                                                          dtype=self.accuracy.dtype), tf.constant(
-                    0, dtype=self.average_dist.dtype)
+                return tf.constant(0, dtype=self.desc_loss.dtype), \
+                       tf.constant(0, dtype=self.det_loss.dtype), \
+                       tf.constant(-1, dtype=self.accuracy.dtype), \
+                       tf.constant(0, dtype=self.average_dist.dtype)
 
             self.desc_loss, self.det_loss, self.accuracy, self.average_dist = tf.cond(condition, true_fn, false_fn)
+
             # Get L2 norm of all weights
             regularization_losses = [tf.nn.l2_loss(v) for v in tf.global_variables() if 'weights' in v.name]
             self.regularization_loss = self.config.weights_decay * tf.add_n(regularization_losses)
             self.loss = self.desc_loss + self.det_loss + self.regularization_loss
+
         tf.summary.scalar('desc loss', self.desc_loss)
         tf.summary.scalar('accuracy', self.accuracy)
         tf.summary.scalar('det loss', self.det_loss)

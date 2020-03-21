@@ -8,7 +8,10 @@ from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 
 
-def deal_with_one_scene(scene, num_keypts):
+def deal_with_one_scene(scene, desc_name, timestr, num_keypts):
+    """
+    calculate the relative repeatability under {num_keypts} settings for {scene}
+    """
     pcdpath = f"../data/3DMatch/fragments/{scene}/"
     keyptspath = f"../geometric_registration/{desc_name}_{timestr}/keypoints/{scene}"
     gtpath = f'../geometric_registration/gt_result/{scene}-evaluation/'
@@ -41,6 +44,9 @@ def deal_with_one_scene(scene, num_keypts):
 
 
 def calculate_repeatability(desc_name, timestr, num_keypts):
+    """
+    calculate the relative repeatability of {desc_name}_{timestr} under {num_keypts} setting.
+    """
     scene_list = [
         '7-scenes-redkitchen',
         'sun3d-home_at-home_at_scan1_2013_jan_1',
@@ -54,7 +60,7 @@ def calculate_repeatability(desc_name, timestr, num_keypts):
 
     scene_repeatability_list = []
     for scene in scene_list:
-        repeatability = deal_with_one_scene(scene, num_keypts=num_keypts)
+        repeatability = deal_with_one_scene(scene, desc_name, timestr, num_keypts=num_keypts)
         scene_repeatability_list.append(repeatability)
     ave_repeatability = sum(scene_repeatability_list) / len(scene_list)
     print(f"Average Repeatability at num_keypts = {num_keypts}: {ave_repeatability}")
