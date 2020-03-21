@@ -1,4 +1,5 @@
 import sys
+import os
 import open3d
 import numpy as np
 import time
@@ -50,6 +51,7 @@ if __name__ == '__main__':
 
     num_list = [4, 8, 16, 32, 64, 128, 256, 512]
     rep_list = []
+    os.chdir("../")
     from multiprocessing import Pool
 
     # pool = Pool(len(num_list))

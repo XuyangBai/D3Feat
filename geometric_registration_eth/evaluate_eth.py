@@ -106,7 +106,7 @@ def deal_with_one_scene(inlier_ratio, distance_threshold, scene):
     start_time = time.time()
     for id1 in range(num_frag):
         for id2 in range(id1 + 1, num_frag):
-            register2Fragments(id1, id2, pcdpath, keyptspath, descpath, resultpath, gtLog, desc_name, inlier_ratio, distance_threshold)
+            register2Fragments(id1, id2, keyptspath, descpath, resultpath, gtLog, desc_name, inlier_ratio, distance_threshold)
     print(f"Finish Evaluation, time: {time.time() - start_time:.2f}s")
 
 

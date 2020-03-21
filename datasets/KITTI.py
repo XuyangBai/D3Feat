@@ -51,7 +51,7 @@ def get_matching_indices(source, target, trans, search_voxel_size, K=None):
 class KITTIDataset(Dataset):
     AUGMENT = None
     DATA_FILES = {
-        'train': '/home/xybai/FCGF/config/train_kitti.txt',
+        'train': 'data/kitti/config/train_kitti.txt',
         'val': 'data/kitti/config/val_kitti.txt',
         'test': 'data/kitti/config/test_kitti.txt'
     }
