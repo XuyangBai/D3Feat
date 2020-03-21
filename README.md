@@ -78,12 +78,12 @@ and runing
 python test_3dmatch.py
 ```
 
-The descriptors and detection scores for each point will be generated and saved in `geometric_registration` folder. Then the `feature matching recall` and `inlier ratio` can be caluclated by running
+The descriptors and detection scores for each point will be generated and saved in `geometric_registration/D3Feat_{timestr}/` folder. Then the `Feature Matching Recall` and `inlier ratio` can be caluclated by running
 ```bash
 cd geometric_registration/
 python evaluate.py D3Feat [timestr of the model]
 ```
-The `registration recall` can be calculated by running the `evaluate.m` in `geometric_registration/3dmatch` which are provided by [3DMatch.](https://github.com/andyzeng/3dmatch-toolbox/tree/master/evaluation/geometric-registration)
+The `Registration Recall` can be calculated by running the `evaluate.m` in `geometric_registration/3dmatch` which are provided by [3DMatch.](https://github.com/andyzeng/3dmatch-toolbox/tree/master/evaluation/geometric-registration) You need to modify the `descriptorName` to `D3Feat_{timestr}` in the `geometric_registration/3dmatch/evaluate.m` file. You can change the number of keypoints in `evaluate.py`
 
 
 ### KITTI
@@ -95,18 +95,21 @@ And
 ```bash
 python test_KITTI.py
 ```
+The detected keypoints and scores for each fragment, as well as the estimated transformation matrix between each ground truth pair will be saved in `geometric_registration_kitti/D3Feat_{timestr}/` folder. Then the `Relative Rotation Error` and `Relative Translation Error` will be calculated by comparing the ground truth pose and estimated pose. The code of this part is heavily borrowed from [FCGF[3]](#refs). You can change the number of keypoints in `utils/test.py`.
 
 ### Keypoint Repeatability
 
-For keypoint repeatability, after generating the descriptors and detection scores, then run
+After generating the descriptors and detection scores (which will be saved in `geometric_registration` or `geometric_registration_kitti`), the keypoint repeatbility can be calculated by running
 
 ```bash
+cd repeatability/
 python evaluate_3dmatch_our.py D3Feat [timestr of the model]
 ```
 
 or
 
 ```bash
+cd repeatability/
 python evaluate_kitti_our.py D3Feat [timestr of the model]
 ```
 
@@ -114,7 +117,7 @@ python evaluate_kitti_our.py D3Feat [timestr of the model]
 
 ## Pretrained Model
 
-We provide the pre-trained model of 3DMatch in `results/` and KITTI in `results_kitti/`
+We provide the pre-trained model of 3DMatch in `results/` and KITTI in `results_kitti/`.
 
 ## References
 <a name="refs"></a>
