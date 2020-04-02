@@ -232,7 +232,7 @@ class ModelTrainer:
         epoch_n = 1
         mean_epoch_n = 0
 
-        self.validation(model, dataset)
+        # self.validation(model, dataset)
 
         # Initialise iterator with train data
         self.sess.run(dataset.train_init_op)
@@ -259,8 +259,8 @@ class ModelTrainer:
                        model.anchor_inputs,
                        model.out_scores,
                        model.out_features,
-                       model.anchor_keypts_inds,
-                       model.positive_keypts_inds
+                       model.anc_keypts_inds,
+                       model.pos_keypts_inds
                        ]
 
                 # If NaN appears in a training, use this debug block
@@ -424,8 +424,8 @@ class ModelTrainer:
                        model.average_dist,
                        model.dists,
                        model.out_scores,
-                       model.anchor_keypts_inds,
-                       model.positive_keypts_inds
+                       model.anc_keypts_inds,
+                       model.pos_keypts_inds
                        )
                 desc_loss, det_loss, accuracy, ave_dist, dists, scores, anc_key, pos_key = self.sess.run(ops, {model.dropout_prob: 1.0})
                 if desc_loss != 0:
