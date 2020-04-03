@@ -69,9 +69,10 @@ class KernelPointFCNN:
                 os.makedirs(snapshot_root, exist_ok=True)
                 tensorboard_root = 'tensorboard/%s' % experiment_id
                 os.makedirs(tensorboard_root, exist_ok=True)
-                # shutil.copy2(os.path.join('.', 'training_3DMatch.py'), os.path.join(snapshot_root, 'train.py'))
-                # shutil.copy2(os.path.join('.', 'utils/trainer.py'), os.path.join(snapshot_root, 'trainer.py'))
-                # shutil.copy2(os.path.join('.', 'models/D3Feat.py'), os.path.join(snapshot_root, 'model.py'))
+                shutil.copy2(os.path.join('.', 'training_3DMatch.py'), os.path.join(snapshot_root, 'train.py'))
+                shutil.copy2(os.path.join('.', 'utils/trainer.py'), os.path.join(snapshot_root, 'trainer.py'))
+                shutil.copy2(os.path.join('.', 'models/D3Feat.py'), os.path.join(snapshot_root, 'model.py'))
+                shutil.copy2(os.path.join('.', 'utils/loss.py'), os.path.join(snapshot_root, 'loss.py'))
                 self.tensorboard_root = tensorboard_root
             else:
                 self.saving_path = self.config.saving_path
@@ -154,7 +155,7 @@ class KernelPointFCNN:
             self.dists += tf.scalar_mul(10, tf.cast(mask, tf.float32))
 
             # calculate the contrastive loss using the dist
-            self.desc_loss, self.accuracy, self.average_dist = LOSS_CHOICES['desc_loss'](self.dists, positiveIDS)
+            self.desc_loss, self.accuracy, self.ave_d_pos, self.ave_d_neg = LOSS_CHOICES['desc_loss'](self.dists, positiveIDS, pos_margin=0.1, neg_margin=1.4)
 
             # calculate the score loss.
             if config.det_loss_weight != 0:
@@ -170,15 +171,16 @@ class KernelPointFCNN:
             condition = tf.less_equal(enough_keypts_num, tf.cast(tf.size(self.anc_keypts_inds), tf.float32))
 
             def true_fn():
-                return self.desc_loss, self.det_loss, self.accuracy, self.average_dist
+                return self.desc_loss, self.det_loss, self.accuracy, self.ave_d_pos, self.ave_d_neg
 
             def false_fn():
                 return tf.constant(0, dtype=self.desc_loss.dtype), \
                        tf.constant(0, dtype=self.det_loss.dtype), \
                        tf.constant(-1, dtype=self.accuracy.dtype), \
-                       tf.constant(0, dtype=self.average_dist.dtype)
+                       tf.constant(0, dtype=self.ave_d_pos.dtype), \
+                       tf.constant(0, dtype=self.ave_d_neg.dtype), \
 
-            self.desc_loss, self.det_loss, self.accuracy, self.average_dist = tf.cond(condition, true_fn, false_fn)
+            self.desc_loss, self.det_loss, self.accuracy, self.ave_d_pos, self.ave_d_neg = tf.cond(condition, true_fn, false_fn)
 
             # Get L2 norm of all weights
             regularization_losses = [tf.nn.l2_loss(v) for v in tf.global_variables() if 'weights' in v.name]
@@ -188,7 +190,8 @@ class KernelPointFCNN:
         tf.summary.scalar('desc loss', self.desc_loss)
         tf.summary.scalar('accuracy', self.accuracy)
         tf.summary.scalar('det loss', self.det_loss)
-        tf.summary.scalar('average dist', self.average_dist)
+        tf.summary.scalar('d_pos', self.ave_d_pos)
+        tf.summary.scalar('d_neg', self.ave_d_neg)
         self.merged = tf.summary.merge_all()
         if self.tensorboard_root != '':
             self.train_writer = tf.summary.FileWriter(self.tensorboard_root + '/train/')

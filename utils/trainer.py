@@ -216,7 +216,7 @@ class ModelTrainer:
         if model.config.saving:
             # Training log file
             with open(join(model.saving_path, 'training.txt'), "w") as file:
-                file.write('Steps desc_loss det_loss train_accuracy ave_dist time memory\n')
+                file.write('Steps desc_loss det_loss train_accuracy d_pos d_neg time memory\n')
 
             # Killing file (simply delete this file when you want to stop the training)
             if not exists(join(model.saving_path, 'running_PID.txt')):
@@ -237,7 +237,8 @@ class ModelTrainer:
         # Initialise iterator with train data
         self.sess.run(dataset.train_init_op)
 
-        ave_dist_buf = []
+        ave_d_neg_buf = []
+        ave_d_pos_buf = []
         desc_loss_buf = []
         det_loss_buf = []
         accuracy_buf = []
@@ -255,7 +256,8 @@ class ModelTrainer:
                        #    model.l2_loss,
                        model.accuracy,
                        model.dists,
-                       model.average_dist,
+                       model.ave_d_pos,
+                       model.ave_d_neg,
                        model.anchor_inputs,
                        model.out_scores,
                        model.out_features,
@@ -274,7 +276,7 @@ class ModelTrainer:
 
                 else:
                     # Run normal
-                    _, merged, L_desc, L_det, acc, dists, ave_dist, inputs, scores, features, anc_key, pos_key = self.sess.run(ops, {
+                    _, merged, L_desc, L_det, acc, dists, ave_d_pos, ave_d_neg, inputs, scores, features, anc_key, pos_key = self.sess.run(ops, {
                         model.dropout_prob: 0.5})
                     if self.training_step % 1000 == 0:
                         print("Anchor Score:", scores[anc_key].squeeze())
@@ -285,8 +287,10 @@ class ModelTrainer:
                         accuracy_buf.append(acc)
                     if L_det != 0:
                         det_loss_buf.append(L_det)
-                    if ave_dist != 0:
-                        ave_dist_buf.append(ave_dist)
+                    if ave_d_pos != 0:
+                        ave_d_pos_buf.append(ave_d_pos)
+                    if ave_d_neg != 0:
+                        ave_d_neg_buf.append(ave_d_neg)
 
                 t += [time.time()]
 
@@ -298,13 +302,14 @@ class ModelTrainer:
                 # Console display (only one per second)
                 if (t[-1] - last_display) > 1.0:
                     last_display = t[-1]
-                    message = 'Step {:08d} L_out={:5.3f} L_det={:5.3f} Acc={:4.2f} Mean Dist:{:4.3f} ' \
+                    message = 'Step {:08d} L_out={:5.3f} L_det={:5.3f} Acc={:4.2f} d_pos:{:4.3f} d_neg:{:4.3f}' \
                               '---{:8.2f} ms/batch (Averaged)'
                     print(message.format(self.training_step,
                                          L_desc,
                                          L_det,
                                          acc,
-                                         ave_dist,
+                                         ave_d_pos,
+                                         ave_d_neg,
                                          1000 * mean_dt[0],
                                          1000 * mean_dt[1]))
 
@@ -312,12 +317,13 @@ class ModelTrainer:
                 if model.config.saving:
                     process = psutil.Process(os.getpid())
                     with open(join(model.saving_path, 'training.txt'), "a") as file:
-                        message = '{:d} {:.3f} {:.3f} {:.2f} {:.2f} {:.3f} {:.1f}\n'
+                        message = '{:d} {:.3f} {:.3f} {:.2f} {:.2f} {:.2f} {:.3f} {:.1f}\n'
                         file.write(message.format(self.training_step,
                                                   L_desc,
                                                   L_det,
                                                   acc,
-                                                  ave_dist,
+                                                  ave_d_pos,
+                                                  ave_d_neg,
                                                   t[-1] - t0,
                                                   process.memory_info().rss * 1e-6))
 
@@ -333,17 +339,20 @@ class ModelTrainer:
                 mean_det_loss = np.mean(det_loss_buf)
                 mean_desc_loss = np.mean(desc_loss_buf)
                 mean_accuracy = np.mean(accuracy_buf)
-                mean_dist = np.mean(ave_dist_buf)
+                mean_d_pos = np.mean(ave_d_pos_buf)
+                mean_d_neg = np.mean(ave_d_neg_buf)
                 summary = tf.Summary()
                 summary.value.add(tag="desc_loss", simple_value=mean_desc_loss)
                 summary.value.add(tag="det_loss", simple_value=mean_det_loss)
                 summary.value.add(tag="accuracy", simple_value=mean_accuracy)
-                summary.value.add(tag="mean_dist", simple_value=mean_dist)
+                summary.value.add(tag="d_pos", simple_value=mean_d_pos)
+                summary.value.add(tag="d_neg", simple_value=mean_d_neg)
                 model.train_writer.add_summary(summary, self.training_epoch + 1)
                 desc_loss_buf = []
                 accuracy_buf = []
                 det_loss_buf = []
-                ave_dist_buf = []
+                ave_d_pos_buf = []
+                ave_d_neg_buf = []
 
                 # End of train dataset, update average of epoch steps
                 mean_epoch_n += (epoch_n - mean_epoch_n) / (self.training_epoch + 1)
@@ -411,7 +420,8 @@ class ModelTrainer:
         desc_loss_buf = []
         det_loss_buf = []
         accuracy_buf = []
-        ave_dist_buf = []
+        ave_d_pos_buf = []
+        ave_d_neg_buf = []
         mean_dt = np.zeros(2)
         last_display = time.time()
         for i0 in range(model.config.validation_size):
@@ -421,13 +431,14 @@ class ModelTrainer:
                 ops = (model.desc_loss,
                        model.det_loss,
                        model.accuracy,
-                       model.average_dist,
+                       model.ave_d_pos,
+                       model.ave_d_neg,
                        model.dists,
                        model.out_scores,
                        model.anc_keypts_inds,
                        model.pos_keypts_inds
                        )
-                desc_loss, det_loss, accuracy, ave_dist, dists, scores, anc_key, pos_key = self.sess.run(ops, {model.dropout_prob: 1.0})
+                desc_loss, det_loss, accuracy, ave_d_pos, ave_d_neg, dists, scores, anc_key, pos_key = self.sess.run(ops, {model.dropout_prob: 1.0})
                 if desc_loss != 0:
                     desc_loss_buf.append(desc_loss)
                 t += [time.time()]
@@ -435,8 +446,10 @@ class ModelTrainer:
                     det_loss_buf.append(det_loss)
                 if accuracy > 0:
                     accuracy_buf.append(accuracy)
-                if ave_dist != 0:
-                    ave_dist_buf.append(ave_dist)
+                if ave_d_pos != 0:
+                    ave_d_pos_buf.append(ave_d_pos)
+                if ave_d_neg != 0:
+                    ave_d_neg_buf.append(ave_d_neg)
                 t += [time.time()]
 
                 mean_dt = 0.95 * mean_dt + 0.05 * (np.array(t[1:]) - np.array(t[:-1]))
@@ -454,29 +467,33 @@ class ModelTrainer:
         mean_desc_loss = np.mean(desc_loss_buf)
         mean_det_loss = np.mean(det_loss_buf)
         mean_accuracy = np.mean(accuracy_buf)
-        mean_dist = np.mean(ave_dist_buf)
+        mean_d_pos = np.mean(ave_d_pos_buf)
+        mean_d_neg = np.mean(ave_d_neg_buf)
         summary = tf.Summary()
         summary.value.add(tag="desc_loss", simple_value=mean_desc_loss)
         summary.value.add(tag="det_loss", simple_value=mean_det_loss)
         summary.value.add(tag="accuracy", simple_value=mean_accuracy)
-        summary.value.add(tag="mean_dist", simple_value=mean_dist)
+        summary.value.add(tag="d_pos", simple_value=mean_d_pos)
+        summary.value.add(tag="d_neg", simple_value=mean_d_neg)
         model.val_writer.add_summary(summary, self.training_epoch)
-        print('{:s} Epoch {:3d}: desc_loss = {:.3f} det_loss = {:.3f} accuracy = {:.2f}%  mean_dist = {:.3f}'.format(model.config.dataset,
+        print('{:s} Epoch {:3d}: desc_loss = {:.3f} det_loss = {:.3f} accuracy = {:.2f}%  d_pos = {:.3f} d_neg = {:.3f}'.format(model.config.dataset,
                                                                                                                      self.training_epoch,
                                                                                                                      mean_desc_loss,
                                                                                                                      mean_det_loss,
                                                                                                                      mean_accuracy * 100,
-                                                                                                                     mean_dist))
+                                                                                                                     mean_d_pos,
+                                                                                                                     mean_d_neg,))
         if model.config.saving:
             process = psutil.Process(os.getpid())
             with open(join(model.saving_path, 'training.txt'), "a") as file:
-                message = '{:s} Epoch {:3d}: desc_loss = {:.3f} det_loss = {:.3f} accuracy = {:.2f}% mean_dist = {:.3f}\n'
+                message = '{:s} Epoch {:3d}: desc_loss = {:.3f} det_loss = {:.3f} accuracy = {:.2f}% d_pos = {:.3f} d_neg = {:.3f}\n'
                 file.write(message.format(model.config.dataset,
                                           self.training_epoch,
                                           mean_desc_loss,
                                           mean_det_loss,
                                           mean_accuracy * 100,
-                                          mean_dist)
+                                          mean_d_pos,
+                                          mean_d_neg)
                            )
         return
 
