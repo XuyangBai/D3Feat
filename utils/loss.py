@@ -80,14 +80,15 @@ def get_at_indices(tensor, indices):
     return tf.gather_nd(tensor, tf.stack((counter, indices), -1))
 
 
-def desc_loss(dists, pids, pos_margin=0.1, neg_margin=1.4, batch_precision_at_k=None):
+def desc_loss(dists, pids, pos_margin=0.1, neg_margin=1.4, false_negative_mask=None):
     """Computes the contrastive loss.
 
     Args:
         dists (2D tensor): A square all-to-all distance matrix as given by cdist.
         pids (1D tensor): The identities of the entries in `batch`, shape (B,).
             This can be of any type that can be compared, thus also a string.
-        pos_margin, neg_margin.
+        pos_margin, neg_margin (float): the margin for contrastive loss
+        false_negative_mask (2D tensor): A boolean matrix to indicate the false negative within the safe_radius.
 
     Returns:
         A 1D tensor of shape (B,) containing the loss value for each sample.
@@ -96,6 +97,9 @@ def desc_loss(dists, pids, pos_margin=0.1, neg_margin=1.4, batch_precision_at_k=
         same_identity_mask = tf.equal(tf.expand_dims(pids, axis=1),
                                       tf.expand_dims(pids, axis=0))
         negative_mask = tf.logical_not(same_identity_mask)
+        if false_negative_mask is not None: 
+            negative_mask = tf.logical_and(negative_mask, tf.logical_not(false_negative_mask))
+        negative_mask.set_shape([None, None])
         # positive_mask = tf.logical_xor(same_identity_mask,
         #                              tf.eye(tf.shape(pids)[0], dtype=tf.bool))
 
@@ -107,58 +111,16 @@ def desc_loss(dists, pids, pos_margin=0.1, neg_margin=1.4, batch_precision_at_k=
         # closest_negative_row = tf.reduce_min(dists + 1e5*tf.cast(same_identity_mask, tf.float32), axis=0)
         # closest_negative = tf.minimum(closest_negative_col, closest_negative_row)
 
-        diff = furthest_positive - closest_negative
-        # calculate average diff to monitor the training
-        # average_diff = tf.reduce_min(diff)
+        # # calculate average negative to monitor the training
         average_negative = tf.map_fn(lambda x: tf.reduce_mean(tf.boolean_mask(x[0], x[1])), (dists, negative_mask), tf.float32)
-        average_diff = tf.reduce_mean(furthest_positive - average_negative)
-        # accuracy = tf.count_nonzero(tf.greater_equal(0., diff), dtype=tf.int64) / tf.shape(diff)[0]
+        # average_diff = tf.reduce_mean(furthest_positive - average_negative)
+        diff = furthest_positive - closest_negative
         accuracy = tf.reduce_sum(tf.cast(tf.greater_equal(0., diff), tf.float32)) / tf.cast(tf.shape(diff)[0], tf.float32)
 
         # contrastive loss
         diff = tf.maximum(furthest_positive - pos_margin, 0.0) + tf.maximum(neg_margin - closest_negative, 0.0)
-
-    if batch_precision_at_k is None:
-        # tf.summary.scalar('loss', tf.reduce_mean(diff))
-        return tf.reduce_mean(diff), accuracy, average_diff
-
-    # For monitoring, compute the within-batch top-1 accuracy and the
-    # within-batch precision-at-k, which is somewhat more expressive.
-    with tf.name_scope("monitoring"):
-        # This is like argsort along the last axis. Add one to K as we'll
-        # drop the diagonal.
-        _, indices = tf.nn.top_k(-dists, k=batch_precision_at_k + 1)
-
-        # Drop the diagonal (distance to self is always least).
-        indices = indices[:, 1:]
-
-        # Generate the index indexing into the batch dimension.
-        # This is simething like [[0,0,0],[1,1,1],...,[B,B,B]]
-        batch_index = tf.tile(
-            tf.expand_dims(tf.range(tf.shape(indices)[0]), 1),
-            (1, tf.shape(indices)[1]))
-
-        # Stitch the above together with the argsort indices to get the
-        # indices of the top-k of each row.
-        topk_indices = tf.stack((batch_index, indices), -1)
-
-        # See if the topk belong to the same person as they should, or not.
-        topk_is_same = tf.gather_nd(same_identity_mask, topk_indices)
-
-        # All of the above could be reduced to the simpler following if k==1
-        # top1_is_same = get_at_indices(same_identity_mask, top_idxs[:,1])
-
-        topk_is_same_f32 = tf.cast(topk_is_same, tf.float32)
-        top1 = tf.reduce_mean(topk_is_same_f32[:, 0])
-        prec_at_k = tf.reduce_mean(topk_is_same_f32)
-
-        # Finally, let's get some more info that can help in debugging while
-        # we're at it!
-        negative_dists = tf.boolean_mask(dists, negative_mask)
-        positive_dists = tf.boolean_mask(dists, same_identity_mask)
-
-        return diff, top1, prec_at_k, topk_is_same, negative_dists, positive_dists
-
+        return tf.reduce_mean(diff), accuracy, tf.reduce_mean(furthest_positive), tf.reduce_mean(average_negative)
+ 
 
 def det_loss(dists, score1, score2, pids):
     with tf.name_scope("det_loss"):

@@ -148,14 +148,17 @@ class KernelPointFCNN:
             self.pos_features = tf.gather(self.out_features, self.pos_keypts_inds)
             dists = cdist(self.anc_features, self.pos_features, metric='euclidean')
             self.dists = dists
-            # add 10 to the false negative pairs (within the safe radius).
+            # find false negative pairs (within the safe radius).
             same_identity_mask = tf.equal(tf.expand_dims(positiveIDS, axis=1), tf.expand_dims(positiveIDS, axis=0))
-            false_negative_mask = tf.less(self.keypts_distance, config.safe_radius)
-            mask = tf.logical_and(false_negative_mask, tf.logical_not(same_identity_mask))
-            self.dists += tf.scalar_mul(10, tf.cast(mask, tf.float32))
+            distance_lessthan_threshold_mask = tf.less(self.keypts_distance, config.safe_radius)
+            false_negative_mask = tf.logical_and(distance_lessthan_threshold_mask, tf.logical_not(same_identity_mask))
 
             # calculate the contrastive loss using the dist
-            self.desc_loss, self.accuracy, self.ave_d_pos, self.ave_d_neg = LOSS_CHOICES['desc_loss'](self.dists, positiveIDS, pos_margin=0.1, neg_margin=1.4)
+            self.desc_loss, self.accuracy, self.ave_d_pos, self.ave_d_neg = LOSS_CHOICES['desc_loss'](self.dists, 
+                                                                                                      positiveIDS, 
+                                                                                                      pos_margin=0.1, 
+                                                                                                      neg_margin=1.4, 
+                                                                                                      false_negative_mask=false_negative_mask)
 
             # calculate the score loss.
             if config.det_loss_weight != 0:
