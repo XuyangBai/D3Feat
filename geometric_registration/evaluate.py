@@ -14,20 +14,11 @@ def build_correspondence(source_desc, target_desc):
     source and target are descriptor for 2 point cloud key points. [5000, 32]
     """
 
-    source_idx = []
-    source_dis = []
-    bf_matcher = cv2.BFMatcher(cv2.NORM_L2)
-    match = bf_matcher.match(source_desc, target_desc)
-    for match_val in match:
-        source_idx.append(match_val.trainIdx)
-        source_dis.append(match_val.distance)
-    target_idx = []
-    target_dis = []
-    bf_matcher = cv2.BFMatcher(cv2.NORM_L2)
-    match = bf_matcher.match(target_desc, source_desc)
-    for match_val in match:
-        target_idx.append(match_val.trainIdx)
-        target_dis.append(match_val.distance)
+    distance = np.sqrt(2 - 2 * (source_desc @ target_desc.T))
+    source_idx = np.argmin(distance, axis=0)
+    source_dis = np.min(distance, axis=0)
+    target_idx = np.argmin(distance, axis=1)
+    target_dis = np.min(distance, axis=1)
 
     result = []
     for i in range(len(source_idx)):
