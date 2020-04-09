@@ -15,10 +15,10 @@ def build_correspondence(source_desc, target_desc):
     """
 
     distance = np.sqrt(2 - 2 * (source_desc @ target_desc.T))
-    source_idx = np.argmin(distance, axis=0)
-    source_dis = np.min(distance, axis=0)
-    target_idx = np.argmin(distance, axis=1)
-    target_dis = np.min(distance, axis=1)
+    source_idx = np.argmin(distance, axis=1)
+    source_dis = np.min(distance, axis=1)
+    target_idx = np.argmin(distance, axis=0)
+    target_dis = np.min(distance, axis=0)
 
     result = []
     for i in range(len(source_idx)):
