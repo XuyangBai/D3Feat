@@ -222,9 +222,9 @@ class ThreeDMatchDataset(Dataset):
                     anc_keypts = self.keypts[split][f'{anc_id}@{pos_id}'][:, 0]
                     pos_keypts = self.keypts[split][f'{anc_id}@{pos_id}'][:, 1]
                     if split == 'train':
-                        selected_ind = np.random.choice(min(len(anc_keypts), len(pos_keypts)), config.keypts_num, replace=False)
+                        selected_ind = np.random.choice(min(len(anc_keypts), len(pos_keypts)), config.keypts_num, replace=True)
                     else:
-                        selected_ind = np.random.choice(min(len(anc_keypts), len(pos_keypts)), 64, replace=False)
+                        selected_ind = np.random.choice(min(len(anc_keypts), len(pos_keypts)), config.keypts_num, replace=True)
                     anc_keypts = anc_keypts[selected_ind]
                     pos_keypts = pos_keypts[selected_ind] + len(anc_points)
 
