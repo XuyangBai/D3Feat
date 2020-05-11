@@ -113,11 +113,14 @@ cd repeatability/
 python evaluate_kitti_our.py D3Feat [timestr of the model]
 ```
 
-
-
 ## Pretrained Model
 
 We provide the pre-trained model of 3DMatch in `results/` and KITTI in `results_kitti/`.
+
+## Post-Conference Update
+
+- Training Loss: We have found that [circle loss](https://arxiv.org/abs/2002.10857) provides an insightful idea for metric learning area and shows better and fast convergence for training D3Feat. To enable it, please change the loss_type to `'circle_loss'` in `KPFCNN_model.py`, and the hyper-paramters for circle loss can be changed in `loss.py`.
+
 
 ## References
 <a name="refs"></a>
