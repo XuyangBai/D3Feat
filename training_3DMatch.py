@@ -110,7 +110,7 @@ class ThreeDMatchConfig(Config):
     # Number of batch
     batch_num = 1
     # Number of keypoints
-    keypts_num = 256
+    keypts_num = 64
 
     # Number of steps per epochs (cannot be None for this dataset)
     epoch_steps = 5000

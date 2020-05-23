@@ -149,9 +149,12 @@ def circle_loss(dists, pids, pos_margin=0.1, neg_margin=1.4, false_negative_mask
         furthest_positive = tf.reduce_max(dists * tf.cast(same_identity_mask, tf.float32), axis=1)
         # closest_negative = tf.map_fn(lambda x: tf.reduce_min(tf.boolean_mask(x[0], x[1])), (dists, negative_mask), tf.float32)
         closest_negative = tf.reduce_min(dists + 1e5 * tf.cast(same_identity_mask, tf.float32), axis=1)   
+        average_negative = tf.reduce_mean(dists * tf.cast(negative_mask,  tf.float32)) * tf.cast(tf.size(pids), tf.float32) / (tf.cast(tf.size(pids), tf.float32) - 1.0)
+        diff = furthest_positive - closest_negative
+        accuracy = tf.reduce_sum(tf.cast(tf.greater_equal(0., diff), tf.float32)) / tf.cast(tf.shape(diff)[0], tf.float32)
         
         # circle loss
-        log_scale = 10
+        log_scale = 25
         # log_scale = tf.Variable(10.0, trainable=True)
         # log_scale = tf.Print(log_scale, [log_scale],  'log_scale')
         pos_optimal = pos_margin
