@@ -37,7 +37,21 @@ A successful point cloud registration often lies on robust establishment of spar
           
 The code is heavily borrowed from [KPConv](https://github.com/HuguesTHOMAS/KPConv/). You can find the guidance for compiling the tensorflow operators and C++ wrappers in [INSTALL.md](https://github.com/HuguesTHOMAS/KPConv/blob/master/INSTALL.md).
 
-      
+## Demo
+
+We provide a small demo to extract dense feature and detection score for two point cloud, and register them using RANSAC. The ply files are saved in the `demo_data` folder, which can be replaced by your own data. Now we are using two point cloud fragments from 3DMatch dataset. To try the demo, please run
+```bash
+    python demo_registration.py
+``` 
+It will compute the descriptors and detection scores using the released weight on 3DMatch dataset, and save them in .npz file in `demo_data`. These descriptors are then used to estimate the rigid-body transformation parameters using RANSAC. Visualization of the inital state and registered state will show up. 
+
+![demo](figures/demo.png)
+
+We also visualize the detected keypoints on two point cloud.
+
+![demo](figures/keypts.png)
+
+
 ## Dataset Download
 
 **3DMatch**

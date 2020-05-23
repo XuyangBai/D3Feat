@@ -843,7 +843,7 @@ class Dataset:
         self.test_data = self.test_data.repeat()
 
         # Prefetch data
-        self.test_data = self.test_data.prefetch(10)
+        # self.test_data = self.test_data.prefetch(10)
 
         #################
         # Common iterator

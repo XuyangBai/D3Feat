@@ -133,9 +133,9 @@ class KernelPointFCNN:
             # self.anchor_keypts_inds, self.positive_keypts_inds, self.keypts_distance = self.anc_key, self.pos_key, self.keypts_distance
 
         # show all the trainable vairble
-        all_trainable_vars = tf.trainable_variables()
-        for i in range(len(all_trainable_vars)):
-            print(i, all_trainable_vars[i])
+        # all_trainable_vars = tf.trainable_variables()
+        # for i in range(len(all_trainable_vars)):
+        #     print(i, all_trainable_vars[i])
         ########
         # Losses
         ########
