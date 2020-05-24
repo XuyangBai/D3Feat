@@ -154,7 +154,7 @@ class KernelPointFCNN:
             false_negative_mask = tf.logical_and(distance_lessthan_threshold_mask, tf.logical_not(same_identity_mask))
 
             # calculate the contrastive loss using the dist
-            self.desc_loss, self.accuracy, self.ave_d_pos, self.ave_d_neg = LOSS_CHOICES['desc_loss'](self.dists, 
+            self.desc_loss, self.accuracy, self.ave_d_pos, self.ave_d_neg = LOSS_CHOICES['circle_loss'](self.dists, 
                                                                                                       positiveIDS, 
                                                                                                       pos_margin=0.1, 
                                                                                                       neg_margin=1.4, 

@@ -194,7 +194,7 @@ def execute_global_registration(src_keypts, tgt_keypts, src_desc, tgt_desc, dist
 
 if __name__ == '__main__':
     point_cloud_files = ["demo_data/cloud_bin_0.ply", "demo_data/cloud_bin_1.ply"]
-    path = 'results/Log_11011055/'
+    path = 'results/Log_contraloss/'
     config = Config()
     config.load(path)
 
